@@ -1,0 +1,24 @@
+Package: fireresponse
+Type: Package
+Title: Functional Group Responses to Fire Regimes
+Version: 0.1.0
+Date: 2023-03-09
+Authors@R: c(
+  person("Victoria", "Reynolds", role = c("aut", "cre"), email = "victoria.reynolds@environment.nsw.gov.au"),
+  person("Michael", "Bedward", role = "aut", email = "mbedward@uow.edu.au")
+  )
+Description: Provides data and functions to predict responses of fauna functional
+    groups to fire regimes, based on expert-elicited data.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.2.3
+Suggests: here
+Depends: R (>= 4.2.0),
+Imports: dplyr,
+  ggplot2,
+  glue,
+  magrittr,
+  stringr,
+  tidyr,
+  triangulr
