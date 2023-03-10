@@ -68,7 +68,7 @@ draw_response_curves <- function(the_group) {
 #'
 #' @return A ggplot object.
 #'
-#' @importFrom ggplot2 ggplot aes geom_line labs
+#' @importFrom ggplot2 ggplot aes geom_line facet_wrap label_both scale_x_continuous labs
 #'
 #' @export
 #'
