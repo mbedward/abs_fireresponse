@@ -32,9 +32,14 @@ explorer <- function() {
         selectInput("fireSeverity", label = "Severity of last fire",
                     choices = sort(unique(GroupOverallResponse$severity))),
 
-        selectInput("fireTSF", label = "Years since last fire",
-                    choices = sort(unique(GroupOverallResponse$tsf)),
-                    multiple = TRUE, selected = 0),
+        sliderInput("fireTSF", label = "Years since last fire",
+                    min = 0, max = max(GroupOverallResponse$tsf),
+                    value = 0,
+                    step = 1,
+                    round = TRUE),
+
+        actionButton("addTSF", "Add", class = "btn-sm"),
+        actionButton("resetTSF", "Reset", class = "btn-sm")
       ),
 
       mainPanel(
@@ -49,17 +54,25 @@ explorer <- function() {
       as.integer( input$groupId )
     })
 
-    firePars <- reactive({
-      tsf <- input$fireTSF
-      tsf <- if (is.null(tsf)) {
-        0
-      } else {
-        as.integer(tsf)
-      }
+    freq <- reactive({
+      as.integer( input$fireFreq )
+    })
 
-      list(frequency = as.integer(input$fireFreq),
-           severity = as.integer(input$fireSeverity),
-           tsf = tsf)
+    sev <- reactive({
+      as.integer( input$fireSeverity )
+    })
+
+    tsfs <- reactiveVal(0)
+
+    observeEvent(input$addTSF, {
+      curVals <- tsfs()
+      newVal <- as.integer( input$fireTSF )
+      if (!(newVal %in% curVals)) tsfs(c(curVals, newVal))
+    })
+
+    observeEvent(input$resetTSF, {
+      newVal <- as.integer( input$fireTSF )
+      tsfs(newVal)
     })
 
     output$componentGraphs <- renderPlot({
@@ -70,9 +83,10 @@ explorer <- function() {
 
     output$overallGraph <- renderPlot({
       fireresponse::draw_overall_response(grp(),
-                                          frequency = firePars()$frequency,
-                                          severity = firePars()$severity,
-                                          tsf = firePars()$tsf) +
+                                          frequency = freq(),
+                                          severity = sev(),
+                                          tsf = tsfs(),
+                                          draw_pzero = TRUE) +
 
         labs(title = glue::glue("Group {grp()} overall response")) +
         theme_bw()

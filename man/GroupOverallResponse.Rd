@@ -5,12 +5,13 @@
 \alias{GroupOverallResponse}
 \title{Overall group responses to specified fire regimes}
 \format{
-A data frame with 1683 rows and 6 columns:
+A data frame with 1683 rows and 7 columns:
 \describe{
 \item{group}{Integer identifier for the functional group (1-18)}
 \item{frequency}{Number of fires in the preceding fifty years}
 \item{severity}{Severity of the most recent fire}
-\item{tsf}{Estimate of lowest expected relative abundance}
+\item{tsf}{Time since last fire (years)}
+\item{pzero}{Probability of zero relative abundance}
 \item{shape1}{First parameter of the approximating beta distribution}
 \item{shape2}{Second parameter of the approximating beta distribution}
 }
@@ -19,9 +20,9 @@ A data frame with 1683 rows and 6 columns:
 GroupOverallResponse
 }
 \description{
-A data frame with parameters for a beta distribution that best approximates
-the overall response of a functional group to a fire regime, as defined by:
-frequency of fire in the preceding fifty year period; severity of last fire;
-and time since last fire (years).
+A data frame with parameters for a zero-inflated beta distribution that best
+approximates the overall response of a functional group to a fire regime, as
+defined by: frequency of fire in the preceding fifty year period; severity of
+last fire; and time since last fire (years).
 }
 \keyword{datasets}

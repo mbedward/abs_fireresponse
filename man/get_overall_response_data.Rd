@@ -4,12 +4,19 @@
 \alias{get_overall_response_data}
 \title{Prepare data to graph group overall response to fire regime(s)}
 \usage{
-get_overall_response_data(the_group, frequency, severity, tsf, dx = 0.005)
+get_overall_response_data(
+  grp,
+  frequency,
+  severity,
+  tsf,
+  interpolation = TRUE,
+  dx = 0.005
+)
 }
 \arguments{
-\item{the_group}{One or more integer identifiers for group. Each value must
-be between 1 and the number of groups defined in
-\code{\link{GroupExpertData}} (currently 18).}
+\item{grp}{One or more integer identifiers for group. Each value must
+be between 1 and the number of groups defined in the \code{GroupOverallResponse}
+table (currently 18).}
 
 \item{frequency}{Integer vector with one or more values of fire frequency in
 the preceding fifty year period.}
@@ -19,10 +26,36 @@ most recent fire.}
 
 \item{tsf}{Integer vector with one or more values of time since last fire
 (years).}
+
+\item{interpolation}{If \code{TRUE} (default), interpolation will be performed
+for any combinations of frequency, severity and time since fire values that
+do not appear in the \code{GroupOverallResponse} look-up table. If
+\code{FALSE}, a warning message will be issued for such combinations and no
+data returned for them.}
+
+\item{dx}{Increment for relative abundance values.}
 }
 \value{
-A data frame.
+A data frame suitable for use with ggplot, with columns:
+  group; frequency; severity; tsf; relabund; density; density_adjusted;
+  regime.
 }
 \description{
-Prepare data to graph group overall response to fire regime(s)
+This is a convenience function that creates a data frame suitable for
+graphing the distribution of expected relative abundance values for one or
+more fire regimes. It is mainly intended as a helper function to be called by
+the \code{\link{draw_overall_response}} function, but can also be called
+explicitly.
+}
+\details{
+Where a requested combination of frequency, severity and time since fire does
+not exist in the \code{GroupOverallResponse} look-up table, the overall
+response will be derived as the weighted mixture of beta distributions for
+the nearest defined combinations. At the moment, this interpolation between
+values is relevant to time since fire, since all integer values for frequency
+and severity between zero and the maximum values considered during
+expert-elicitation are represented in the look-up table.
+}
+\seealso{
+\code{\link{draw_overall_response}}
 }

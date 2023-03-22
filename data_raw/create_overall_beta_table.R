@@ -6,17 +6,18 @@
 # in the 'data' folder as GroupExpertData.rda.
 
 library(dplyr, warn.conflicts = FALSE)
+library(here)
 
 library(doFuture)
 registerDoFuture()
 
 initls <- ls(all.names = TRUE)
 
-# On UOW processing machine
-NCORES <- 40
+# On processing machine
+NCORES <- 50
 
 # On laptop
-# NCORES <- 4
+# NCORES <- 8
 
 
 source(here::here("R/beta_approximation.R"))
@@ -47,17 +48,19 @@ GroupOverallResponse <- lapply(sort(unique(GroupExpertData$group)), function(the
 
   dat_params <- foreach(i = 1:nrow(dat_combns)) %dopar% {
     vals <- unlist(dat_combns[i,])
-    beta_pars <- find_beta_approximation(the_group,
-                                         frequency = vals['frequency'],
-                                         severity = vals['severity'],
-                                         tsf = vals['tsf'])
+
+    zib_pars <- find_zibeta_approximation(the_group,
+                                          frequency = vals['frequency'],
+                                          severity = vals['severity'],
+                                          tsf = vals['tsf'])
 
     data.frame(group = the_group,
                frequency = vals['frequency'],
                severity = vals['severity'],
                tsf = vals['tsf'],
-               shape1 = beta_pars['shape1'],
-               shape2 = beta_pars['shape2'])
+               pzero = zib_pars['pzero'],
+               shape1 = zib_pars['shape1'],
+               shape2 = zib_pars['shape2'])
   }
 
   plan(sequential)

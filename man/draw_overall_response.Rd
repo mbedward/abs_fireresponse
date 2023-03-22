@@ -4,7 +4,15 @@
 \alias{draw_overall_response}
 \title{Graph group overall response to fire regime(s)}
 \usage{
-draw_overall_response(the_group, frequency, severity, tsf, linewidth = 1)
+draw_overall_response(
+  the_group,
+  frequency,
+  severity,
+  tsf,
+  adjusted_density = TRUE,
+  linewidth = 1,
+  draw_pzero = TRUE
+)
 }
 \arguments{
 \item{the_group}{One or more integer identifiers for group. Each value must

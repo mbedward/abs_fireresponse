@@ -2,16 +2,9 @@
 % Please edit documentation in R/beta_approximation.R
 \name{get_tri_samples}
 \alias{get_tri_samples}
-\title{Draw random samples from triangular distributions for a given group and fire regime}
+\title{Sample component triangular distributions for a group and fire regime}
 \usage{
-get_tri_samples(
-  the_group,
-  frequency,
-  severity,
-  tsf,
-  weights = c(1, 1, 1),
-  nsamples = 10000
-)
+get_tri_samples(the_group, frequency, severity, tsf, nsamples = 10000)
 }
 \arguments{
 \item{the_group}{Integer group number: a single value between 1 and the
@@ -23,16 +16,12 @@ number of groups defined in \code{\link{GroupExpertData}} (currently 18).}
 
 \item{tsf}{Time since last fire (years).}
 
-\item{weights}{Weights to apply to the component variables when calculating
-the overall response as a weighted product. All values must be positive.
-The default is to weight all components equally. Order of elements is
-frequency, severity, tsf.}
-
 \item{nsamples}{Number of random samples to generate from each component
 triangular distribution.}
 }
 \value{
-A data frame with \code{nsamples} rows
+A data frame with \code{nsamples} rows and a column for each of
+  frequency, severity and tsf.
 }
 \description{
 Note: This is a private function and is mainly intended for generating the

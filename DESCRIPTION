@@ -1,8 +1,8 @@
 Package: fireresponse
 Type: Package
 Title: Functional Group Responses to Fire Regimes
-Version: 0.1.1.9999
-Date: 2023-03-13
+Version: 0.1.2
+Date: 2023-03-22
 Authors@R: c(
   person("Victoria", "Reynolds", role = c("aut", "cre"), email = "victoria.reynolds@environment.nsw.gov.au"),
   person("Michael", "Bedward", role = "aut", email = "mbedward@uow.edu.au")
@@ -20,6 +20,7 @@ Imports: dplyr,
   ggplot2,
   glue,
   magrittr,
+  patchwork,
   stringr,
   tidyr,
   triangulr
