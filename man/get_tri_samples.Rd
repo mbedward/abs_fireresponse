@@ -4,7 +4,14 @@
 \alias{get_tri_samples}
 \title{Sample component triangular distributions for a group and fire regime}
 \usage{
-get_tri_samples(the_group, frequency, severity, tsf, nsamples = 10000)
+get_tri_samples(
+  the_group,
+  frequency,
+  severity,
+  tsf,
+  nsamples = 10000,
+  seed = 42
+)
 }
 \arguments{
 \item{the_group}{Integer group number: a single value between 1 and the
@@ -18,13 +25,22 @@ number of groups defined in \code{\link{GroupExpertData}} (currently 18).}
 
 \item{nsamples}{Number of random samples to generate from each component
 triangular distribution.}
+
+\item{seed}{Seed value to initialize the pseudo-random number generator
+(default = 42). This allows reproducible results between sessions. Set to
+\code{NULL} or \code{NA} to allow random samples from a given set of
+distributions to vary between sessions.}
 }
 \value{
-A data frame with \code{nsamples} rows and a column for each of
-  frequency, severity and tsf.
+A data frame with \code{nsamples} rows and a column for each fire
+  component: frequency, severity and tsf. The group and seed value (if
+  defined) are added as attributes of the returned data frame.
 }
 \description{
-Note: This is a private function and is mainly intended for generating the
-package data frame \code{\link{GroupOverallResponse}}
+Draws random samples from each of the triangular distributions representing
+the bounded expert estimates of the effect of each fire regime component
+(frequency, severity and time since fire) on the expected relative abundance
+of a given group. This function is mainly intended for generating the package
+data frame \code{\link{GroupOverallResponse}} but can also be used for other
+purposes.
 }
-\keyword{internal}

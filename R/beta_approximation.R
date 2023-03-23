@@ -3,25 +3,37 @@
 #' This function can be used with \code{\link{find_zibeta_approximation}} to
 #' calculate overall response values based on vectors of values sampled from the
 #' fire component distributions. It combines the component values as a weighted
-#' product.
+#' product raised to a power \code{lambda} (default = 1/3).
 #'
 #' @param xcomponents A three-column matrix or data frame of sample values for
 #'   fire regime components. Column order must be: frequency, severity, tsf.
 #'
 #' @param weights A vector of three, positive weight values to apply to the
 #'   component variables when calculating the overall response as a weighted
-#'   product. Order of elements is frequency, severity, tsf. Zero values are
-#'   allowed (might be useful for exploratory purposes). The default is to
-#'   weight all components equally.
+#'   product. Order of elements is frequency, severity, tsf. Input weights will
+#'   be scaled so that they sum to 3.0. Zero values are allowed (might be useful
+#'   for exploratory purposes). The default is to weight all components equally.
 #'
-#' @keywords internal
+#' @param lambda A single numeric value (default = 1/3) to map the weighted
+#'   product to the overall response value as:
+#'   \deqn{y_{overall} = (\sum{x_i wt_i})^\lambda }
 #'
-FUN_OVERALL_PRODUCT = function(xcomponents, weights = c(1,1,1)) {
+#' @return A vector of overall response values.
+#'
+.FUN_overall_product = function(xcomponents, weights = c(1,1,1), lambda = 1/3) {
   stopifnot(ncol(xcomponents) == 3)
+  stopifnot(length(weights) == 3)
   stopifnot(all(weights >= 0))
   stopifnot(sum(weights) > 0)
 
-  apply(xcomponents, MARGIN = 1, function(xi) prod(xi * weights))
+  if (length(lambda) > 1) {
+    warning("lambda should be length 1; only using first value")
+    lambda <- lambda[1]
+  }
+
+  weights <- weights * 3 / sum(weights)
+
+  apply(xcomponents, MARGIN = 1, function(xi) prod(xi * weights)^lambda)
 }
 
 
@@ -48,9 +60,7 @@ FUN_OVERALL_PRODUCT = function(xcomponents, weights = c(1,1,1)) {
 #'
 #' @return A vector of overall response values.
 #'
-#' @keywords internal
-#'
-FUN_OVERALL_SUM_THRESHOLD = function(xcomponents, weights = c(1,1,1), zero_threshold = 0.05) {
+.FUN_overall_sum_threshold = function(xcomponents, weights = c(1,1,1), zero_threshold = 0.05) {
   stopifnot(ncol(xcomponents) == 3)
   stopifnot(all(weights >= 0))
   stopifnot(sum(weights) > 0)
@@ -86,7 +96,7 @@ FUN_OVERALL_SUM_THRESHOLD = function(xcomponents, weights = c(1,1,1), zero_thres
 #'
 #' @param FUN A function that will be applied to the matrix of component sample
 #'   values to calculate the corresponding overall response values. Default is
-#'   the function \link{FUN_OVERALL_SUM_THRESHOLD}.
+#'   the function \link{.FUN_overall_sum_threshold}.
 #'
 #' @return A numeric vector with three named elements:
 #' \describe{
@@ -95,12 +105,10 @@ FUN_OVERALL_SUM_THRESHOLD = function(xcomponents, weights = c(1,1,1), zero_thres
 #'   \item{shape2}{second beta parameter for non-zero values (NA if pzero is 1.0)}
 #' }
 #'
-#' @keywords internal
-#'
 find_zibeta_approximation <- function(the_group,
                                       frequency, severity, tsf,
                                       nsamples = 1e4,
-                                      FUN = FUN_OVERALL_SUM_THRESHOLD) {
+                                      FUN = .FUN_overall_sum_threshold) {
 
   stopifnot(length(the_group) == 1)
   stopifnot(the_group %in% GroupExpertData$group)
@@ -138,8 +146,12 @@ find_zibeta_approximation <- function(the_group,
 
 #' Sample component triangular distributions for a group and fire regime
 #'
-#' Note: This is a private function and is mainly intended for generating the
-#' package data frame \code{\link{GroupOverallResponse}}
+#' Draws random samples from each of the triangular distributions representing
+#' the bounded expert estimates of the effect of each fire regime component
+#' (frequency, severity and time since fire) on the expected relative abundance
+#' of a given group. This function is mainly intended for generating the package
+#' data frame \code{\link{GroupOverallResponse}} but can also be used for other
+#' purposes.
 #'
 #' @param the_group Integer group number: a single value between 1 and the
 #'   number of groups defined in \code{\link{GroupExpertData}} (currently 18).
@@ -153,12 +165,20 @@ find_zibeta_approximation <- function(the_group,
 #' @param nsamples Number of random samples to generate from each component
 #'   triangular distribution.
 #'
-#' @return A data frame with \code{nsamples} rows and a column for each of
-#'   frequency, severity and tsf.
+#' @param seed Seed value to initialize the pseudo-random number generator
+#'   (default = 42). This allows reproducible results between sessions. Set to
+#'   \code{NULL} or \code{NA} to allow random samples from a given set of
+#'   distributions to vary between sessions.
 #'
-#' @keywords internal
+#' @return A data frame with \code{nsamples} rows and a column for each fire
+#'   component: frequency, severity and tsf. The group and seed value (if
+#'   defined) are added as attributes of the returned data frame.
 #'
-get_tri_samples <- function(the_group, frequency, severity, tsf, nsamples = 1e4) {
+get_tri_samples <- function(the_group,
+                            frequency, severity, tsf,
+                            nsamples = 1e4,
+                            seed = 42) {
+
   stopifnot(length(the_group) == 1,
             the_group >= 1,
             the_group <= max(GroupExpertData$group))
@@ -184,6 +204,7 @@ get_tri_samples <- function(the_group, frequency, severity, tsf, nsamples = 1e4)
     res
   }
 
+  if (!is.null(seed) && !is.na(seed)) set.seed(seed)
   dat_samples <- dat %>%
     dplyr::group_by(type) %>%
     dplyr::do({
@@ -196,6 +217,7 @@ get_tri_samples <- function(the_group, frequency, severity, tsf, nsamples = 1e4)
     tidyr::pivot_wider(names_from = type, values_from = r) %>%
     dplyr::select(-rep)
 
+  attributes(dat_samples = list(group = the_group, seed = seed))
   dat_samples
 }
 

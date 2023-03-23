@@ -75,15 +75,17 @@ draw_response_curves <- function(the_group) {
 draw_overall_response <- function(the_group, frequency, severity, tsf,
                                   adjusted_density = TRUE,
                                   linewidth = 1,
-                                  draw_pzero = TRUE) {
+                                  draw_pzero = TRUE,
+                                  colour_map = "cividis") {
 
   dat <- get_overall_response_data(the_group, frequency, severity, tsf)
 
   gg_dens <- .do_draw_overall_response(dat,
                                        adjusted_density = adjusted_density,
-                                       linewidth = linewidth)
+                                       linewidth = linewidth,
+                                       colour_map = colour_map)
   if (draw_pzero) {
-    gg_zero <- .do_draw_prob_zero(dat)
+    gg_zero <- .do_draw_prob_zero(dat, colour_map = colour_map)
 
     patchwork::wrap_plots(gg_zero, gg_dens, ncol = 1, heights = c(2,8))
 
@@ -94,10 +96,13 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 
 
 # Private helper function to draw overall response densities
-#' @importFrom ggplot2 ggplot aes geom_line scale_x_continuous labs facet_wrap label_both
+#' @importFrom ggplot2 ggplot aes geom_line scale_x_continuous scale_colour_viridis_d
+#' @importFrom ggplot2 labs facet_wrap label_both
+#
 .do_draw_overall_response <- function(dat,
                                       adjusted_density = TRUE,
-                                      linewidth = 1) {
+                                      linewidth = 1,
+                                      colour_map = "cividis") {
 
   ngroups <- dplyr::n_distinct(dat$group)
   nregimes <- dplyr::n_distinct(dat$regime)
@@ -109,11 +114,8 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
   }
 
   gg <- gg +
-    if (nregimes > 1) {
-      geom_line(aes(colour = regime), linewidth=linewidth)
-    } else {
-      geom_line(linewidth=linewidth)
-    }
+    geom_line(aes(colour = regime), linewidth=linewidth) +
+    scale_colour_viridis_d(option = colour_map) +
 
   if (ngroups > 1) {
     gg <- gg + facet_wrap(~group, labeller = label_both, scales = "free_y")
@@ -128,8 +130,10 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 
 
 # Private helper function to draw prob zero graph
-#' @importFrom ggplot2 ggplot aes geom_point geom_segment scale_x_continuous labs facet_wrap label_both theme
-.do_draw_prob_zero <- function(dat) {
+#' @importFrom ggplot2 ggplot aes geom_point geom_segment scale_x_continuous scale_colour_viridis_d
+#' @importFrom ggplot2 labs facet_wrap label_both theme
+#
+.do_draw_prob_zero <- function(dat, colour_map = "cividis") {
   dat_zero <- dat %>%
     dplyr::group_by(group, regime) %>%
     dplyr::summarize(pzero = dplyr::first(pzero))
@@ -139,6 +143,7 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
   gg <- ggplot(data = dat_zero, aes(y = regime)) +
     geom_segment(x = 0, aes(xend = pzero, yend = regime, colour = regime), linewidth = 2) +
     geom_point(aes(x = pzero, colour = regime), size = 4) +
+    scale_colour_viridis_d(option = colour_map) +
     scale_x_continuous(breaks = seq(0, 1, 0.2), limits = c(0, 1)) +
     labs(x = "Probability of zero relative abundance", y = "") +
     theme(legend.position = "none")
@@ -272,7 +277,7 @@ get_overall_response_data <- function(grp,
     if (is.na(dat_beta$shape1[j])) {
       # No beta parameters because of high pzero value
       dat$density <- NA
-      dat$adjusted_density <- NA
+      dat$density_adjusted <- NA
     } else {
       # Beta parameters are defined
       dat <- dat %>% dplyr::mutate(

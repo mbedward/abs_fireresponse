@@ -10,7 +10,7 @@ find_zibeta_approximation(
   severity,
   tsf,
   nsamples = 10000,
-  FUN = FUN_OVERALL_SUM_THRESHOLD
+  FUN = .FUN_overall_sum_threshold
 )
 }
 \arguments{
@@ -29,7 +29,7 @@ is 1000.}
 
 \item{FUN}{A function that will be applied to the matrix of component sample
 values to calculate the corresponding overall response values. Default is
-the function \link{FUN_OVERALL_SUM_THRESHOLD}.}
+the function \link{.FUN_overall_sum_threshold}.}
 }
 \value{
 A numeric vector with three named elements:
@@ -43,4 +43,3 @@ A numeric vector with three named elements:
 Note: This is a private function and is mainly intended for generating the
 package data frame \code{\link{GroupOverallResponse}}
 }
-\keyword{internal}

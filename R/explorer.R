@@ -5,8 +5,9 @@
 #' (frequency, severity and time since fire) based on expert-elicited data are
 #' shown, together with the resulting overall response distribution(s). Overall
 #' responses can be displayed for multiple fire regimes, but at present these
-#' can only differ in time since and must share the same frequency and severity
-#' values. This restriction will be relaxed in a future version of the package.
+#' can only differ in time since fire and must share the same frequency and
+#' severity values. This restriction will be relaxed in a future version of the
+#' package.
 #'
 #' The \code{shiny} package must be installed to use this function.
 #'
@@ -88,8 +89,7 @@ explorer <- function() {
                                           tsf = tsfs(),
                                           draw_pzero = TRUE) +
 
-        labs(title = glue::glue("Group {grp()} overall response")) +
-        theme_bw()
+        labs(title = glue::glue("Group {grp()} overall response"))
     })
   }
 
