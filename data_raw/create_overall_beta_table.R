@@ -8,8 +8,11 @@
 library(dplyr, warn.conflicts = FALSE)
 library(here)
 
+library(doRNG)
 library(doFuture)
+
 registerDoFuture()
+registerDoRNG()
 
 initls <- ls(all.names = TRUE)
 

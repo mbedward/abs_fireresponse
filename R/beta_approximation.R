@@ -199,7 +199,18 @@ get_tri_samples <- function(the_group,
   fn_make_valid <- function(lwr, upr, mode, eps = 1e-3) {
     res <- c(lwr, upr, mode)
     if (isTRUE(all.equal(lwr, upr))) {
-      res <- res + c(-eps, 0, -eps/2)
+      if (lwr > 0.0 & upr < 1.0) {
+        # squashed but away from 0 or 1, so nudge lwr and upr apart
+        res <- res + c(-min(eps, lwr), min(eps, upr), 0)
+
+      } else if (lwr < eps) {
+        # squashed at 0, so nudge upr and mode upwards
+        res <- res + c(0, eps, 0)
+
+      } else {
+        # squashed at 1, so nudge lwr and mode downwards
+        res <- res + c(-eps, 0, 0)
+      }
     }
     res
   }
@@ -217,7 +228,10 @@ get_tri_samples <- function(the_group,
     tidyr::pivot_wider(names_from = type, values_from = r) %>%
     dplyr::select(-rep)
 
-  attributes(dat_samples = list(group = the_group, seed = seed))
+  # Record group and seed value for this set of samples
+  attr(dat_samples, "group") <- the_group
+  attr(dat_samples, "seed") <- seed
+
   dat_samples
 }
 
