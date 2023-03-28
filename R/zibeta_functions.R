@@ -54,12 +54,15 @@ pzibeta <- function(x, pzero, shape1, shape2, lower.tail = TRUE, log.p = FALSE) 
 #' @export
 #'
 qzibeta <- function(p, pzero, shape1, shape2, lower.tail = TRUE, log.p = FALSE) {
+  stopifnot(length(shape1) == 1, length(shape2) == 1)
+
   if (!lower.tail) p <- 1 - p
   if (log.p) p <- exp(p)
 
-  ifelse(p <= pzero,
-         qbeta((p-pzero)/(1-pzero), shape1, shape2, lower.tail=TRUE, log.p=FALSE)
-         )
+  sapply(p, function(ip) {
+    if(ip <= pzero) 0
+    else qbeta((ip-pzero)/(1-pzero), shape1, shape2, lower.tail=TRUE, log.p=FALSE)
+  })
 }
 
 
@@ -71,6 +74,8 @@ qzibeta <- function(p, pzero, shape1, shape2, lower.tail = TRUE, log.p = FALSE) 
 #'   non-zero values.
 #'
 #' @return Vector of random values.
+#'
+#' @export
 #'
 rzibeta <- function(n, pzero, shape1, shape2) {
   r <- rep(0, n)
