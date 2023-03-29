@@ -75,11 +75,17 @@
 }
 
 
+###############################################################################
+# Private alias for default function to combine triangular distribution samples
+# into overall response samples.
+.FUN_OVERALL <- .FUN_overall_sum_threshold
+###############################################################################
+
 
 #' Derive overall fire response and approximating zero-inflated beta distribution
 #'
-#' Note: This is a private function and is mainly intended for generating the
-#' package data frame \code{\link{GroupOverallResponse}}
+#' This function is mainly intended to generate the package data frame
+#' \code{\link{GroupOverallResponse}} but might be useful for other purposes.
 #'
 #' @param the_group Integer group number: a single value between 1 and the
 #'   number of groups defined in \code{\link{GroupExpertData}} (currently 18).
@@ -98,17 +104,23 @@
 #'   values to calculate the corresponding overall response values. Default is
 #'   the function \link{.FUN_overall_sum_threshold}.
 #'
+#' @param pzero_threshold Maximum value of pzero (default=0.99) for which beta
+#'   parameters will be fitted.
+#'
 #' @return A numeric vector with three named elements:
 #' \describe{
 #'   \item{pzero}{probability of zero relative abundance value}
-#'   \item{shape1}{first beta parameter for non-zero values (NA if pzero is 1.0)}
-#'   \item{shape2}{second beta parameter for non-zero values (NA if pzero is 1.0)}
+#'   \item{shape1}{first beta parameter for non-zero values (NA if pzero is close to 1.0)}
+#'   \item{shape2}{second beta parameter for non-zero values (NA if pzero is close to 1.0)}
 #' }
+#'
+#' @export
 #'
 find_zibeta_approximation <- function(the_group,
                                       frequency, severity, tsf,
                                       nsamples = 1e4,
-                                      FUN = .FUN_overall_sum_threshold) {
+                                      FUN = .FUN_OVERALL,
+                                      pzero_threshold = 0.99) {
 
   stopifnot(length(the_group) == 1)
   stopifnot(the_group %in% GroupExpertData$group)
@@ -120,6 +132,14 @@ find_zibeta_approximation <- function(the_group,
   # Calculate overall response value for each sample row
   overall <- FUN(dat_samples)
 
+  .do_find_zibeta_approximation(overall, pzero_threshold)
+}
+
+
+# Private helper function for `find_zibeta_approximation`.
+# Also used by other package functions.
+#
+.do_find_zibeta_approximation <- function(overall, pzero_threshold) {
   # Proportion of zero sample values
   isz <- overall == 0
   pzero <- mean(isz)
@@ -127,7 +147,7 @@ find_zibeta_approximation <- function(the_group,
   # Fit a beta distribution to the non-zero values, if there are enough.
   shape1 <- NA_real_
   shape2 <- NA_real_
-  if (pzero < 0.99) {
+  if (pzero <= pzero_threshold) {
     init_pars = c(mean(overall[!isz]), 1.0)
     suppressWarnings({
       o <- optim(par = init_pars, fn = .fn_beta_ll, gr=NULL, x = overall[!isz],
@@ -174,6 +194,8 @@ find_zibeta_approximation <- function(the_group,
 #'   component: frequency, severity and tsf. The group and seed value (if
 #'   defined) are added as attributes of the returned data frame.
 #'
+#' @export
+#'
 get_tri_samples <- function(the_group,
                             frequency, severity, tsf,
                             nsamples = 1e4,
@@ -182,6 +204,11 @@ get_tri_samples <- function(the_group,
   stopifnot(length(the_group) == 1,
             the_group >= 1,
             the_group <= max(GroupExpertData$group))
+
+  # TODO - might be good to allow multiple fire regimes at some stage...
+  stopifnot(length(frequency) == 1)
+  stopifnot(length(severity) == 1)
+  stopifnot(length(tsf) == 1)
 
   dat <- GroupExpertData %>%
     dplyr::filter(group == the_group & (

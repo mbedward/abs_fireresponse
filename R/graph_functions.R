@@ -73,7 +73,6 @@ draw_response_curves <- function(the_group) {
 #' @export
 #'
 draw_overall_response <- function(the_group, frequency, severity, tsf,
-                                  adjusted_density = TRUE,
                                   linewidth = 1,
                                   draw_pzero = TRUE,
                                   colour_map = "cividis") {
@@ -81,7 +80,6 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
   dat <- get_overall_response_data(the_group, frequency, severity, tsf)
 
   gg_dens <- .do_draw_overall_response(dat,
-                                       adjusted_density = adjusted_density,
                                        linewidth = linewidth,
                                        colour_map = colour_map)
   if (draw_pzero) {
@@ -100,20 +98,13 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 #' @importFrom ggplot2 labs facet_wrap label_both
 #
 .do_draw_overall_response <- function(dat,
-                                      adjusted_density = TRUE,
                                       linewidth = 1,
                                       colour_map = "cividis") {
 
   ngroups <- dplyr::n_distinct(dat$group)
   nregimes <- dplyr::n_distinct(dat$regime)
 
-  if (adjusted_density) {
-    gg <- ggplot(data = dat, aes(x = relabund, y = density_adjusted))
-  } else {
-    gg <- ggplot(data = dat, aes(x = relabund, y = density))
-  }
-
-  gg <- gg +
+  gg <- ggplot(data = dat, aes(x = relabund, y = density)) +
     geom_line(aes(colour = regime), linewidth=linewidth) +
     scale_colour_viridis_d(option = colour_map) +
 
@@ -123,7 +114,7 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 
   gg <- gg +
     scale_x_continuous(breaks = seq(0, 1, 0.2)) +
-    labs(x = "Relative abundance", y = ifelse(adjusted_density[1], "Adjusted density", "Density"))
+    labs(x = "Relative abundance", y = "Density")
 
   gg
 }
@@ -209,6 +200,92 @@ get_overall_response_data <- function(grp,
                                       interpolation = TRUE,
                                       dx = 0.005) {
 
+  # Get distribution parameters for the group and regime(s).
+  # This function also does validity checks on the input arguments.
+  #
+  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, interpolation)
+
+  # Generate data
+  dat_ggs <- lapply(seq_len(nrow(dat_beta)), function(j) {
+    suppressWarnings(
+      dat <- cbind(dat_beta[j, c("group", "frequency", "severity", "tsf", "pzero")],
+                   relabund = seq(0, 1, by=dx))
+    )
+
+    if (is.na(dat_beta$shape1[j])) {
+      # No beta parameters because of high pzero value
+      dat$density <- NA
+    } else {
+      # Beta parameters are defined
+      dat <- dat %>% dplyr::mutate(
+        density = dzibeta(relabund, dat_beta$pzero[j], dat_beta$shape1[j], dat_beta$shape2[j]) )
+    }
+
+    dat
+  })
+
+  # Combine individual data frames
+  dat_gg <- do.call(rbind, dat_ggs) %>%
+    dplyr::arrange(group, frequency, severity, tsf, relabund)
+
+  # Add a column of fire regime labels
+  dat_gg <- dat_gg %>%
+    dplyr::mutate(regime = glue::glue("f={frequency}, sev={severity}, tsf={tsf}"),
+
+                  # make label a factor to preserve sensible ordering of values when graphed
+                  regime = factor(regime, levels = unique(regime)))
+
+  dat_gg
+}
+
+
+#' Get parameters for ZIBeta distributions that approximate group overall
+#' response to specified fire regimes
+#'
+#' Given a set of integer group IDs, and one or more fire regimes defined as
+#' combinations of frequency, severity and time since fire values, this function
+#' returns the parameters for zero-inflated beta distributions that approximate
+#' the group's overall response to each regime. If a regime is defined in the
+#' package look-up table \code{\link{GroupOverallResponse}}, the function simply
+#' returns the corresponding distribution parameters. For other fire regimes,
+#' the parameters will be derived as the weighted mixture of beta distributions
+#' for the most similar reference fire regimes.
+#'
+#' At the moment, interpolation between fire regimes only involves time since
+#' fire, since all integer values for frequency and severity between zero and
+#' the maximum values considered during expert-elicitation are represented in
+#' the look-up table. Extrapolation beyond the range of any of the three fire
+#' regime component variables is not supported.
+#'
+#' @param grp One or more integer identifiers for group. Each value must be
+#'   between 1 and the number of groups defined in the
+#'   \code{GroupOverallResponse} table (currently 18).
+#'
+#' @param frequency Integer vector with one or more values of fire frequency in
+#'   the preceding fifty year period.
+#'
+#' @param severity Integer vector with one or more values of severity for the
+#'   most recent fire.
+#'
+#' @param tsf Integer vector with one or more values of time since last fire
+#'   (years).
+#'
+#' @param interpolation If \code{TRUE} (default), interpolation will be performed
+#'   for any combinations of frequency, severity and time since fire values that
+#'   do not appear in the \code{GroupOverallResponse} look-up table. If
+#'   \code{FALSE}, a warning message will be issued for such combinations and no
+#'   data returned for them.
+#'
+#' @return A data frame suitable for use with ggplot, with columns:
+#'   group; pzero; shape1; shape2.
+#'
+#' @seealso \code{\link{draw_overall_response}} \code{\link{get_overall_response_data}}
+#'
+#' @export
+get_zibeta_parameters <- function(grp,
+                                  frequency, severity, tsf,
+                                  interpolation = TRUE) {
+
 
   # Initial validity checks
   ok <- .group_is_defined(grp)
@@ -261,92 +338,93 @@ get_overall_response_data <- function(grp,
                              severity = severity,
                              tsf = tsf)
 
-  # Get zero-inflated beta parameters for regimes that are present in the
+  # Get distribution parameters for regimes that are defined in the
   # look-up table.
-  dat_beta <- dat_regimes %>%
-    # Note: using an inner join drops any undefined regimes (TSF not present in look-up)
-    dplyr::inner_join(GroupOverallResponse, by = c("group", "frequency", "severity", "tsf"))
+  dat_beta_def <- dat_regimes %>%
+    # Note: using an inner join drops any undefined regimes.
+    dplyr::inner_join(GroupOverallResponse,
+                      by = c("group", "frequency", "severity", "tsf"))
 
-  # Generate data for defined regimes
-  dats_def <- lapply(seq_len(nrow(dat_beta)), function(j) {
-    suppressWarnings(
-      dat <- cbind(dat_beta[j, c("group", "frequency", "severity", "tsf", "pzero")],
-                   relabund = seq(0, 1, by=dx))
-    )
+  # If any group x regime combinations have high pzero and missing beta parameters,
+  # set the shape parameters to 1.0 so graph functions can draw something.
+  k <- is.na(dat_beta_def$shape1)
+  if (any(k)) {
+    dat_beta_def$pzero[k] <- 1.0
+    dat_beta_def$shape1[k] <- 1.0
+    dat_beta_def$shape2[k] <- 1.0
+  }
 
-    if (is.na(dat_beta$shape1[j])) {
-      # No beta parameters because of high pzero value
-      dat$density <- NA
-      dat$density_adjusted <- NA
-    } else {
-      # Beta parameters are defined
-      dat <- dat %>% dplyr::mutate(
-        density = dbeta(relabund, dat_beta$shape1[j], dat_beta$shape2[j]),
-        density_adjusted = density * (1.0 - pzero))
+  if (interpolation) {
+    # Interpolate parameters for undefined regimes.
+    #
+    dat_beta_undef <- dplyr::anti_join(dat_regimes, GroupOverallResponse,
+                                       by = c("group", "frequency", "severity", "tsf")) %>%
+
+      dplyr::mutate(pzero = NA_real_, shape1 = NA_real_, shape2 = NA_real_)
+
+    for (j in seq_len(nrow(dat_beta_undef))) {
+      target_tsf <- dat_beta_undef$tsf[j]
+      dat_enclosing <- .tsf_enclosing_values(target_tsf)
+
+      suppressWarnings(
+        zibeta_pars <- cbind(dat_beta_undef[j, c("group", "frequency", "severity")],
+                             dat_enclosing) %>%
+
+          dplyr::left_join(GroupOverallResponse,
+                           by = c("group", "frequency", "severity", "tsf"))
+      )
+
+      if(nrow(zibeta_pars) != 2) {
+        stop("Bummer! Problem when trying to interpolate for TSF value ", target_tsf)
+      }
+
+      nshape <- sum(!is.na(zibeta_pars$shape1))
+      if (nshape == 2) {
+        # Both neighbouring fire regimes have beta shape parameters
+        dat_beta_undef$pzero[j] <- with(zibeta_pars, sum(wt * pzero))
+        dat_beta_undef$shape1[j] <- with(zibeta_pars, sum(wt * shape1))
+        dat_beta_undef$shape2[j] <- with(zibeta_pars, sum(wt * shape2))
+
+      } else if (nshape == 1) {
+        # One regime missing shape parameters - must be high pzero value.
+        # Fall back to sampling the component triangular distributions for
+        # both enclosing regimes and deriving a weighted mixture.
+        N <- 1e4
+        tri <- with(zibeta_pars,
+                    get_tri_samples(group[1], frequency[1], severity[1], tsf[1], nsamples=N))
+
+        tri2 <- with(zibeta_pars,
+                     get_tri_samples(group[2], frequency[2], severity[2], tsf[2], nsamples=N))
+
+        # Weighted mixture
+        b <- runif(N) < zibeta_pars$wt[1]
+        tri <- rbind(tri[b,], tri2[!b,])
+
+        # Overall response values calculated using default function (with default args)
+        overall <- .FUN_OVERALL(tri)
+
+        pars <- .do_find_zibeta_approximation(overall, pzero_threshold = 0.99)
+
+        dat_beta_undef$pzero[j] <- pars['pzero']
+        dat_beta_undef$shape1[j] <- pars['shape1']
+        dat_beta_undef$shape2[j] <- pars['shape2']
+
+      } else {
+        # Neither enclosing regime has shape parameters.
+        # Set pzero to 1.0 and both shape parameters to 1.0 so
+        # something can be drawn by graph functions
+        # (TODO: better way?)
+        dat_beta_undef$pzero[j] <- 1.0
+        dat_beta_undef$shape1[j] <- 1.0
+        dat_beta_undef$shape2[j] <- 1.0
+      }
     }
+  } else {  # not interpolating
+    dat_beta_undef <- NULL
+  }
 
-    dat
-  })
-
-  # Generate data for undefined regimes (ie. TSF values needing interpolation).
-  # NOTE: we are assuming that the checks above ensured interpolation was requested.
-  #
-  dat_undef_regimes <- dplyr::anti_join(dat_regimes, GroupOverallResponse,
-                                        by = c("group", "frequency", "severity", "tsf"))
-
-  dats_interp <- lapply(seq_len(nrow(dat_undef_regimes)), function(j) {
-    target_tsf <- dat_undef_regimes$tsf[j]
-    dat_enclosing <- .tsf_enclosing_values(target_tsf)
-
-    suppressWarnings(
-    beta_pars <- cbind(dat_undef_regimes[j, c("group", "frequency", "severity")],
-                       dat_enclosing) %>%
-
-      dplyr::left_join(GroupOverallResponse, by = c("group", "frequency", "severity", "tsf"))
-    )
-
-    if(nrow(beta_pars) != 2) stop("Bummer: error when trying to interpolate")
-
-    # Interpolated value for prob zero
-    pzero_interp <- with(beta_pars, sum(wt * pzero))
-
-    suppressWarnings(
-      res <- cbind(beta_pars[1, c("group", "frequency", "severity")],
-                   tsf = target_tsf,
-                   pzero = pzero_interp,
-                   relabund = seq(0, 1, by=dx))
-    )
-
-    if (anyNA(beta_pars$shape1)) {
-      # One or both sets of beta parameters missing because of
-      # high pzero value, so can't interpolate
-      res$density <- NA_real_
-      res$density_adjusted <- NA_real_
-
-    } else {
-      shape1_interp <- with(beta_pars, sum(wt * shape1))
-      shape2_interp <- with(beta_pars, sum(wt * shape2))
-
-      res <- res %>%
-        dplyr::mutate(density = dbeta(relabund, shape1_interp, shape2_interp),
-                      density_adjusted = density * (1.0 - pzero))
-    }
-
-    res
-  })
-
-  # Combine individual data frames
-  dat_gg <- do.call(rbind, c(dats_def, dats_interp)) %>%
-    dplyr::arrange(group, frequency, severity, tsf, relabund)
-
-  # Add a column of fire regime labels
-  dat_gg <- dat_gg %>%
-    dplyr::mutate(regime = glue::glue("f={frequency}, sev={severity}, tsf={tsf}"),
-
-                  # make label a factor to preserve sensible ordering of values when graphed
-                  regime = factor(regime, levels = unique(regime)))
-
-  dat_gg
+  # Return parameters
+  rbind(dat_beta_def, dat_beta_undef) %>%
+    dplyr::arrange(group, frequency, severity, tsf)
 }
-
 

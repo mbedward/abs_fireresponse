@@ -9,7 +9,6 @@ draw_overall_response(
   frequency,
   severity,
   tsf,
-  adjusted_density = TRUE,
   linewidth = 1,
   draw_pzero = TRUE,
   colour_map = "cividis"

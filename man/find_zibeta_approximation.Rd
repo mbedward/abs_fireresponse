@@ -10,7 +10,8 @@ find_zibeta_approximation(
   severity,
   tsf,
   nsamples = 10000,
-  FUN = .FUN_overall_sum_threshold
+  FUN = .FUN_OVERALL,
+  pzero_threshold = 0.99
 )
 }
 \arguments{
@@ -30,16 +31,19 @@ is 1000.}
 \item{FUN}{A function that will be applied to the matrix of component sample
 values to calculate the corresponding overall response values. Default is
 the function \link{.FUN_overall_sum_threshold}.}
+
+\item{pzero_threshold}{Maximum value of pzero (default=0.99) for which beta
+parameters will be fitted.}
 }
 \value{
 A numeric vector with three named elements:
 \describe{
   \item{pzero}{probability of zero relative abundance value}
-  \item{shape1}{first beta parameter for non-zero values (NA if pzero is 1.0)}
-  \item{shape2}{second beta parameter for non-zero values (NA if pzero is 1.0)}
+  \item{shape1}{first beta parameter for non-zero values (NA if pzero is close to 1.0)}
+  \item{shape2}{second beta parameter for non-zero values (NA if pzero is close to 1.0)}
 }
 }
 \description{
-Note: This is a private function and is mainly intended for generating the
-package data frame \code{\link{GroupOverallResponse}}
+This function is mainly intended to generate the package data frame
+\code{\link{GroupOverallResponse}} but might be useful for other purposes.
 }
