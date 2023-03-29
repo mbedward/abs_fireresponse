@@ -2,9 +2,18 @@
 % Please edit documentation in R/zibeta_functions.R
 \name{dzibeta}
 \alias{dzibeta}
-\title{Density function for the zero-inflated beta distribution}
+\alias{pzibeta}
+\alias{qzibeta}
+\alias{rzibeta}
+\title{Zero-inflated Beta Distribution}
 \usage{
 dzibeta(x, pzero, shape1, shape2, log = FALSE)
+
+pzibeta(x, pzero, shape1, shape2, lower.tail = TRUE, log.p = FALSE)
+
+qzibeta(p, pzero, shape1, shape2, lower.tail = TRUE, log.p = FALSE)
+
+rzibeta(n, pzero, shape1, shape2)
 }
 \arguments{
 \item{x}{Vector of quantiles.}
@@ -13,11 +22,22 @@ dzibeta(x, pzero, shape1, shape2, log = FALSE)
 
 \item{shape1, shape2}{Non-negative parameters of the beta distribution for non-zero values.}
 
-\item{log}{If \code{TRUE}, log density values are returned.}
+\item{log, log.p}{If \code{TRUE}, log density / probability values are returned.}
+
+\item{lower.tail}{If \code{TRUE} (default), probabilities are \eqn{P[X \le x]},
+otherwise \eqn{P[X \gt x]}.}
+
+\item{p}{Vector of probabilities.}
+
+\item{n}{Number of observations. If \code{length(n) > 1}, the length is taken
+to be the number required.}
 }
 \value{
-Vector of density values.
+\code{dbeta} returns the density, \code{pbeta} returns the probability,
+  \code{qbeta} returns the quantile, and \code{rbeta} generates random values.
 }
 \description{
-Density function for the zero-inflated beta distribution
+Density, distribution function, quantile function and random generation for
+the Zero-inflated Beta distribution with parameters \code{pzero},
+\code{shape1} and \code{shape2}.
 }
