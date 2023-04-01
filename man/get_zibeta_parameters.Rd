@@ -5,7 +5,14 @@
 \title{Get parameters for ZIBeta distributions that approximate group overall
 response to specified fire regimes}
 \usage{
-get_zibeta_parameters(grp, frequency, severity, tsf, interpolation = TRUE)
+get_zibeta_parameters(
+  grp,
+  frequency,
+  severity,
+  tsf,
+  cross = TRUE,
+  interpolation = TRUE
+)
 }
 \arguments{
 \item{grp}{One or more integer identifiers for group. Each value must be
@@ -20,6 +27,14 @@ most recent fire.}
 
 \item{tsf}{Integer vector with one or more values of time since last fire
 (years).}
+
+\item{cross}{Logical value. If \code{TRUE} (default), a set of fire regimes
+will be created for all combinations of the fire component vectors:
+frequency, severity and tsf values. In this case, vectors can have
+different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
+values will result in 12 fire regimes. If \code{FALSE}, a fire regime
+\emph{i} is defined by the \emph{i}th element of each of the three
+component vectors. In this case, the vectors must all have the same length.}
 
 \item{interpolation}{If \code{TRUE} (default), interpolation will be performed
 for any combinations of frequency, severity and time since fire values that

@@ -9,9 +9,10 @@ draw_overall_response(
   frequency,
   severity,
   tsf,
+  cross = TRUE,
   linewidth = 1,
   draw_pzero = TRUE,
-  colour_map = "cividis"
+  colour_map = "viridis"
 )
 }
 \arguments{
@@ -27,6 +28,25 @@ most recent fire.}
 
 \item{tsf}{Integer vector with one or more values of time since last fire
 (years).}
+
+\item{cross}{Logical value. If \code{TRUE} (default), a set of fire regimes
+will be created for all combinations of the fire component vectors:
+frequency, severity and tsf values. In this case, vectors can have
+different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
+values will result in 12 fire regimes. If \code{FALSE}, a fire regime
+\emph{i} is defined by the \emph{i}th element of each of the three
+component vectors. In this case, the vectors must all have the same length.}
+
+\item{linewidth}{Value to pass to ggplot for line width (default = 1).}
+
+\item{draw_pzero}{Logical. If \code{TRUE} (default), a separate graph showing
+the probability of zero relative abundance under each fire regime is drawn
+and placed above the graph of overall response distribution using the
+\code{patchwork} package.}
+
+\item{colour_map}{Character string indicating the colour map option to use
+with the viridis palette. Default is \code{"cividis"}. See
+\code{\link[ggplot2]{scale_colour_viridis_d}} for details.}
 }
 \value{
 A ggplot object.

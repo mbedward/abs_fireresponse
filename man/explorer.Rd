@@ -11,10 +11,8 @@ This function launches a simple graphical interface to explore fire response
 curves. Given a selected group, the response to each fire regime component
 (frequency, severity and time since fire) based on expert-elicited data are
 shown, together with the resulting overall response distribution(s). Overall
-responses can be displayed for multiple fire regimes, but at present these
-can only differ in time since fire and must share the same frequency and
-severity values. This restriction will be relaxed in a future version of the
-package.
+responses can be displayed for multiple fire regimes, but presently only for
+one group at a time.
 }
 \details{
 The \code{shiny} package must be installed to use this function.

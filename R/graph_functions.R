@@ -66,18 +66,39 @@ draw_response_curves <- function(the_group) {
 #' @param tsf Integer vector with one or more values of time since last fire
 #'   (years).
 #'
+#' @param cross Logical value. If \code{TRUE} (default), a set of fire regimes
+#'   will be created for all combinations of the fire component vectors:
+#'   frequency, severity and tsf values. In this case, vectors can have
+#'   different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
+#'   values will result in 12 fire regimes. If \code{FALSE}, a fire regime
+#'   \emph{i} is defined by the \emph{i}th element of each of the three
+#'   component vectors. In this case, the vectors must all have the same length.
+#'
+#' @param linewidth Value to pass to ggplot for line width (default = 1).
+#'
+#' @param draw_pzero Logical. If \code{TRUE} (default), a separate graph showing
+#'   the probability of zero relative abundance under each fire regime is drawn
+#'   and placed above the graph of overall response distribution using the
+#'   \code{patchwork} package.
+#'
+#' @param colour_map Character string indicating the colour map option to use
+#'   with the viridis palette. Default is \code{"cividis"}. See
+#'   \code{\link[ggplot2]{scale_colour_viridis_d}} for details.
+#'
 #' @return A ggplot object.
 #'
 #' @importFrom ggplot2 ggplot aes geom_line facet_wrap label_both scale_x_continuous labs
 #'
 #' @export
 #'
-draw_overall_response <- function(the_group, frequency, severity, tsf,
+draw_overall_response <- function(the_group,
+                                  frequency, severity, tsf,
+                                  cross = TRUE,
                                   linewidth = 1,
                                   draw_pzero = TRUE,
-                                  colour_map = "cividis") {
+                                  colour_map = "viridis") {
 
-  dat <- get_overall_response_data(the_group, frequency, severity, tsf)
+  dat <- get_overall_response_data(the_group, frequency, severity, tsf, cross)
 
   gg_dens <- .do_draw_overall_response(dat,
                                        linewidth = linewidth,
@@ -106,7 +127,7 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 
   gg <- ggplot(data = dat, aes(x = relabund, y = density)) +
     geom_line(aes(colour = regime), linewidth=linewidth) +
-    scale_colour_viridis_d(option = colour_map) +
+    scale_colour_viridis_d(option = colour_map, direction = -1, end = 0.8) +
 
   if (ngroups > 1) {
     gg <- gg + facet_wrap(~group, labeller = label_both, scales = "free_y")
@@ -134,7 +155,7 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
   gg <- ggplot(data = dat_zero, aes(y = regime)) +
     geom_segment(x = 0, aes(xend = pzero, yend = regime, colour = regime), linewidth = 2) +
     geom_point(aes(x = pzero, colour = regime), size = 4) +
-    scale_colour_viridis_d(option = colour_map) +
+    scale_colour_viridis_d(option = colour_map, direction = -1, end = 0.8) +
     scale_x_continuous(breaks = seq(0, 1, 0.2), limits = c(0, 1)) +
     labs(x = "Probability of zero relative abundance", y = "") +
     theme(legend.position = "none")
@@ -178,6 +199,14 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 #' @param tsf Integer vector with one or more values of time since last fire
 #'   (years).
 #'
+#' @param cross Logical value. If \code{TRUE} (default), a set of fire regimes
+#'   will be created for all combinations of the fire component vectors:
+#'   frequency, severity and tsf values. In this case, vectors can have
+#'   different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
+#'   values will result in 12 fire regimes. If \code{FALSE}, a fire regime
+#'   \emph{i} is defined by the \emph{i}th element of each of the three
+#'   component vectors. In this case, the vectors must all have the same length.
+#'
 #' @param interpolation If \code{TRUE} (default), interpolation will be performed
 #'   for any combinations of frequency, severity and time since fire values that
 #'   do not appear in the \code{GroupOverallResponse} look-up table. If
@@ -197,13 +226,14 @@ draw_overall_response <- function(the_group, frequency, severity, tsf,
 #'
 get_overall_response_data <- function(grp,
                                       frequency, severity, tsf,
+                                      cross = TRUE,
                                       interpolation = TRUE,
                                       dx = 0.005) {
 
   # Get distribution parameters for the group and regime(s).
   # This function also does validity checks on the input arguments.
   #
-  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, interpolation)
+  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, cross, interpolation)
 
   # Generate data
   dat_ggs <- lapply(seq_len(nrow(dat_beta)), function(j) {
@@ -267,6 +297,14 @@ get_overall_response_data <- function(grp,
 #' @param severity Integer vector with one or more values of severity for the
 #'   most recent fire.
 #'
+#' @param cross Logical value. If \code{TRUE} (default), a set of fire regimes
+#'   will be created for all combinations of the fire component vectors:
+#'   frequency, severity and tsf values. In this case, vectors can have
+#'   different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
+#'   values will result in 12 fire regimes. If \code{FALSE}, a fire regime
+#'   \emph{i} is defined by the \emph{i}th element of each of the three
+#'   component vectors. In this case, the vectors must all have the same length.
+#'
 #' @param tsf Integer vector with one or more values of time since last fire
 #'   (years).
 #'
@@ -284,6 +322,7 @@ get_overall_response_data <- function(grp,
 #' @export
 get_zibeta_parameters <- function(grp,
                                   frequency, severity, tsf,
+                                  cross = TRUE,
                                   interpolation = TRUE) {
 
 
@@ -333,10 +372,31 @@ get_zibeta_parameters <- function(grp,
   }
 
   # Regimes for which data are requested
-  dat_regimes <- expand.grid(group = grp,
-                             frequency = unique(frequency),
-                             severity = unique(severity),
-                             tsf = unique(tsf))
+  if (cross[1]) {
+    # Orthogonal combinations
+    dat_regimes <- expand.grid(group = grp,
+                               frequency = unique(frequency),
+                               severity = unique(severity),
+                               tsf = unique(tsf))
+  } else {
+    # Check component value vectors have equal length
+    n <- length(frequency)
+    if (length(severity) != n || length(tsf) != n) {
+      stop("'cross' argument is FALSE but frequency, severity \n",
+           "       and tsf vectors do not have the same length")
+    }
+
+    # Create a regime for each i-th tuple of component values
+    dat_regimes <- data.frame(frequency = frequency,
+                              severity = severity,
+                              tsf = tsf)
+
+    # Remove any repeated regimes
+    dat_regimes <- dplyr::distinct(dat_regimes)
+
+    # Cross with group(s)
+    dat_regimes <- dplyr::cross_join(data.frame(group = grp), dat_regimes)
+  }
 
   # Get distribution parameters for regimes that are defined in the
   # look-up table.
