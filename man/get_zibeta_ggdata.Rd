@@ -4,7 +4,13 @@
 \alias{get_zibeta_ggdata}
 \title{Generate data to draw zero-inflated beta distributions with ggplot}
 \usage{
-get_zibeta_ggdata(pzero, shape1, shape2, type = c("density", "probability"))
+get_zibeta_ggdata(
+  pzero,
+  shape1,
+  shape2,
+  type = c("density", "probability"),
+  cross = TRUE
+)
 }
 \arguments{
 \item{pzero}{One or more values for probability of zero.}
@@ -15,6 +21,11 @@ get_zibeta_ggdata(pzero, shape1, shape2, type = c("density", "probability"))
 
 \item{type}{A character string specifying the type of y variable; either
 'density' (default) or 'probability'. May be abbreviated.}
+
+\item{cross}{(logical; default \code{TRUE}) Whether to generate data for all
+orthogonal combinations of the distribution parameter arguments, or only
+for row-wise combinations. See Description for details. Ignored if all
+parameter arguments have only one element.}
 }
 \value{
 A data frame with columns: pzero, shape1, shape2, x, y and label. The
@@ -26,7 +37,10 @@ This function takes parameters for one or more zero-inflated beta
 distributions and returns a data frame of density or probability values over
 the unit interval. You can use it to explore the shape of alternative
 distributions. If any of the arguments \code{pzero, shape1, shape2} have more
-than one element, data is generated for all combinations.
+than one element, and argument \code{cross == TRUE}, data is generated for
+all combinations. If \code{cross == FALSE}, the arguments \code{pzero,
+shape1, shape2} must have the same length and data is generated for
+\code{pzero[i], shape1[i], shape2[i]} with \code{i in 1:length(pzero)}.
 }
 \examples{
 library(ggplot2)
@@ -39,5 +53,12 @@ dat <- get_zibeta_ggdata(pzero = c(0, 0.3, 0.6), shape1 = 20, shape2 = 30)
 ggplot(data = dat) +
   geom_line(aes(x=x, y=y, colour=label), linewidth=1.5) +
   scale_colour_viridis_d(end=0.8, direction = -1)
+
+# Get data for two distributions, fully specifying the parameters
+# for each. Note cross = FALSE tells the function NOT to generate
+# data for the eight orthogonal combinations of parameters.
+#
+dat <- get_zibeta_ggdata(pzero = c(0, 0.3), shape1 = c(20, 30), shape2 = c(30, 50),
+                         cross = FALSE)
 
 }

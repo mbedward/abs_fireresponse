@@ -1,8 +1,8 @@
 Package: fireresponse
 Type: Package
 Title: Functional Group Responses to Fire Regimes
-Version: 0.1.10
-Date: 2023-04-05
+Version: 0.1.11
+Date: 2023-04-27
 Authors@R: c(
   person("Victoria", "Reynolds", role = c("aut", "cre"), email = "victoria.reynolds@environment.nsw.gov.au"),
   person("Michael", "Bedward", role = "aut", email = "mbedward@uow.edu.au")

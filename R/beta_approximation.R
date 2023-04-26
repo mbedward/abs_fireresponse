@@ -139,7 +139,7 @@ find_zibeta_approximation <- function(the_group,
 # Private helper function for `find_zibeta_approximation`.
 # Also used by other package functions.
 #
-.do_find_zibeta_approximation <- function(overall, pzero_threshold) {
+.do_find_zibeta_approximation <- function(overall, pzero_threshold = 0.99) {
   # Proportion of zero sample values
   isz <- overall == 0
   pzero <- mean(isz)
