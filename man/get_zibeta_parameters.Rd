@@ -5,14 +5,7 @@
 \title{Get parameters for ZIBeta distributions that approximate group overall
 response to specified fire regimes}
 \usage{
-get_zibeta_parameters(
-  grp,
-  frequency,
-  severity,
-  tsf,
-  cross = TRUE,
-  interpolation = TRUE
-)
+get_zibeta_parameters(grp, frequency, severity, tsf, cross = TRUE)
 }
 \arguments{
 \item{grp}{One or more integer identifiers for group. Each value must be
@@ -35,16 +28,10 @@ different lengths; e.g. 2 frequency values x 3 severity values x 2 tsf
 values will result in 12 fire regimes. If \code{FALSE}, a fire regime
 \emph{i} is defined by the \emph{i}th element of each of the three
 component vectors. In this case, the vectors must all have the same length.}
-
-\item{interpolation}{If \code{TRUE} (default), interpolation will be performed
-for any combinations of frequency, severity and time since fire values that
-do not appear in the \code{GroupOverallResponse} look-up table. If
-\code{FALSE}, a warning message will be issued for such combinations and no
-data returned for them.}
 }
 \value{
-A data frame suitable for use with ggplot, with columns:
-  group; pzero; shape1; shape2.
+A data frame with columns:
+  group; frequency; severity; tsf; pzero; shape1; shape2.
 }
 \description{
 Given a set of integer group IDs, and one or more fire regimes defined as
@@ -54,15 +41,15 @@ the group's overall response to each regime. If a regime is defined in the
 package look-up table \code{\link{GroupOverallResponse}}, the function simply
 returns the corresponding distribution parameters. For other fire regimes,
 the parameters will be derived as the weighted mixture of beta distributions
-for the most similar reference fire regimes.
-}
-\details{
-At the moment, interpolation between fire regimes only involves time since
-fire, since all integer values for frequency and severity between zero and
-the maximum values considered during expert-elicitation are represented in
-the look-up table. Extrapolation beyond the range of any of the three fire
-regime component variables is not supported.
+for the most similar reference fire regimes. At the moment, interpolation
+between fire regimes only applies to time since fire, since all integer
+values for frequency and severity between zero and the maximum values
+considered during expert-elicitation are represented in the look-up table.
+Extrapolation beyond the range of any of the three fire regime component
+variables is not supported.
 }
 \seealso{
-\code{\link{draw_overall_response}} \code{\link{get_overall_response_data}}
+\code{\link{draw_overall_response}} for a short-cut method to graph
+  response curves; \code{\link{get_overall_response_data}} to generate a data
+  frame of density or probability values suitable for use with ggplot.
 }

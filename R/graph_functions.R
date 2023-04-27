@@ -148,7 +148,9 @@ draw_overall_response <- function(the_group,
 .do_draw_prob_zero <- function(dat, colour_map = "cividis") {
   dat_zero <- dat %>%
     dplyr::group_by(group, regime) %>%
-    dplyr::summarize(pzero = dplyr::first(pzero))
+    dplyr::filter(relabund == 0) %>%
+    dplyr::summarize(pzero = dplyr::first(density)) %>%
+    dplyr::ungroup()
 
   ngroups <- dplyr::n_distinct(dat$group)
 
@@ -182,8 +184,8 @@ draw_overall_response <- function(the_group,
 #' not exist in the \code{GroupOverallResponse} look-up table, the overall
 #' response will be derived as the weighted mixture of beta distributions for
 #' the nearest defined combinations. At the moment, this interpolation between
-#' values is relevant to time since fire, since all integer values for frequency
-#' and severity between zero and the maximum values considered during
+#' values only applies to time since fire, since all integer values for
+#' frequency and severity between zero and the maximum values considered during
 #' expert-elicitation are represented in the look-up table.
 #'
 #' @param grp One or more integer identifiers for group. Each value must
@@ -207,44 +209,38 @@ draw_overall_response <- function(the_group,
 #'   \emph{i} is defined by the \emph{i}th element of each of the three
 #'   component vectors. In this case, the vectors must all have the same length.
 #'
-#' @param interpolation If \code{TRUE} (default), interpolation will be performed
-#'   for any combinations of frequency, severity and time since fire values that
-#'   do not appear in the \code{GroupOverallResponse} look-up table. If
-#'   \code{FALSE}, a warning message will be issued for such combinations and no
-#'   data returned for them.
-#'
-#'
 #' @param dx Increment for relative abundance values.
 #'
 #' @return A data frame suitable for use with ggplot, with columns:
-#'   group; frequency; severity; tsf; relabund; density; density_adjusted;
-#'   regime.
+#'   group; frequency; severity; tsf; relabund (sequence of values from 0 to 1);
+#'   density; regime (character label).
 #'
-#' @seealso \code{\link{draw_overall_response}}
+#' @seealso \code{\link{draw_overall_response}} which calls this function and
+#'   graphs the results.
 #'
 #' @export
 #'
 get_overall_response_data <- function(grp,
                                       frequency, severity, tsf,
                                       cross = TRUE,
-                                      interpolation = TRUE,
                                       dx = 0.005) {
 
   # Get distribution parameters for the group and regime(s).
   # This function also does validity checks on the input arguments.
   #
-  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, cross, interpolation)
+  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, cross)
 
   # Generate data
   dat_ggs <- lapply(seq_len(nrow(dat_beta)), function(j) {
     suppressWarnings(
-      dat <- cbind(dat_beta[j, c("group", "frequency", "severity", "tsf", "pzero")],
+      dat <- cbind(dat_beta[j, c("group", "frequency", "severity", "tsf")],
                    relabund = seq(0, 1, by=dx))
     )
 
     if (is.na(dat_beta$shape1[j])) {
       # No beta parameters because of high pzero value
       dat$density <- NA
+      dat$density[1] <- dat_beta$pzero[j]  # density for 0.0 is pzero
     } else {
       # Beta parameters are defined
       dat <- dat %>% dplyr::mutate(
@@ -279,13 +275,12 @@ get_overall_response_data <- function(grp,
 #' package look-up table \code{\link{GroupOverallResponse}}, the function simply
 #' returns the corresponding distribution parameters. For other fire regimes,
 #' the parameters will be derived as the weighted mixture of beta distributions
-#' for the most similar reference fire regimes.
-#'
-#' At the moment, interpolation between fire regimes only involves time since
-#' fire, since all integer values for frequency and severity between zero and
-#' the maximum values considered during expert-elicitation are represented in
-#' the look-up table. Extrapolation beyond the range of any of the three fire
-#' regime component variables is not supported.
+#' for the most similar reference fire regimes. At the moment, interpolation
+#' between fire regimes only applies to time since fire, since all integer
+#' values for frequency and severity between zero and the maximum values
+#' considered during expert-elicitation are represented in the look-up table.
+#' Extrapolation beyond the range of any of the three fire regime component
+#' variables is not supported.
 #'
 #' @param grp One or more integer identifiers for group. Each value must be
 #'   between 1 and the number of groups defined in the
@@ -308,22 +303,18 @@ get_overall_response_data <- function(grp,
 #' @param tsf Integer vector with one or more values of time since last fire
 #'   (years).
 #'
-#' @param interpolation If \code{TRUE} (default), interpolation will be performed
-#'   for any combinations of frequency, severity and time since fire values that
-#'   do not appear in the \code{GroupOverallResponse} look-up table. If
-#'   \code{FALSE}, a warning message will be issued for such combinations and no
-#'   data returned for them.
+#' @return A data frame with columns:
+#'   group; frequency; severity; tsf; pzero; shape1; shape2.
 #'
-#' @return A data frame suitable for use with ggplot, with columns:
-#'   group; pzero; shape1; shape2.
-#'
-#' @seealso \code{\link{draw_overall_response}} \code{\link{get_overall_response_data}}
+#' @seealso \code{\link{draw_overall_response}} for a short-cut method to graph
+#'   response curves; \code{\link{get_overall_response_data}} to generate a data
+#'   frame of density or probability values suitable for use with ggplot.
 #'
 #' @export
+#'
 get_zibeta_parameters <- function(grp,
                                   frequency, severity, tsf,
-                                  cross = TRUE,
-                                  interpolation = TRUE) {
+                                  cross = TRUE) {
 
 
   # Initial validity checks
@@ -348,27 +339,14 @@ get_zibeta_parameters <- function(grp,
     stop(msg)
   }
 
-  # If interpolation is not being used, check that all TSF values are defined
-  if (!interpolation) {
-    ok <- .tsf_is_defined(tsf)
-    if (any(!ok)) {
-      msg <- glue::glue("Time since fire value(s) not defined in reference data
-                           and interpolation was not requested: \\
-                           {paste(tsf[!ok], collapse = ', ')}")
-      stop(msg)
-    }
-
-  } else {
-    # Interpolation is being used, so check that all TSF values are within
-    # the valid range
-    MaxTSF <- max(GroupOverallResponse$tsf)
-    ok <- tsf >= 0 & tsf <= MaxTSF
-    if (any(!ok)) {
-      msg <- glue::glue("Time since fire value(s) outside range in reference
+  # Check that all TSF values are within the valid range
+  MaxTSF <- max(GroupOverallResponse$tsf)
+  ok <- tsf >= 0 & tsf <= MaxTSF
+  if (any(!ok)) {
+    msg <- glue::glue("Time since fire value(s) outside range in reference
                            data (0 - {MaxTSF}): \\
                            {paste(tsf[!ok], collapse = ', ')}")
-      stop(msg)
-    }
+    stop(msg)
   }
 
   # Regimes for which data are requested
@@ -414,73 +392,69 @@ get_zibeta_parameters <- function(grp,
     dat_beta_def$shape2[k] <- 1.0
   }
 
-  if (interpolation) {
-    # Interpolate parameters for undefined regimes.
-    #
-    dat_beta_undef <- dplyr::anti_join(dat_regimes, GroupOverallResponse,
-                                       by = c("group", "frequency", "severity", "tsf")) %>%
+  # Interpolate parameters for undefined regimes.
+  #
+  dat_beta_undef <- dplyr::anti_join(dat_regimes, GroupOverallResponse,
+                                     by = c("group", "frequency", "severity", "tsf")) %>%
 
-      dplyr::mutate(pzero = NA_real_, shape1 = NA_real_, shape2 = NA_real_)
+    dplyr::mutate(pzero = NA_real_, shape1 = NA_real_, shape2 = NA_real_)
 
-    for (j in seq_len(nrow(dat_beta_undef))) {
-      target_tsf <- dat_beta_undef$tsf[j]
-      dat_enclosing <- .tsf_enclosing_values(target_tsf)
+  for (j in seq_len(nrow(dat_beta_undef))) {
+    target_tsf <- dat_beta_undef$tsf[j]
+    dat_enclosing <- .tsf_enclosing_values(target_tsf)
 
-      suppressWarnings(
-        zibeta_pars <- cbind(dat_beta_undef[j, c("group", "frequency", "severity")],
-                             dat_enclosing) %>%
+    suppressWarnings(
+      zibeta_pars <- cbind(dat_beta_undef[j, c("group", "frequency", "severity")],
+                           dat_enclosing) %>%
 
-          dplyr::left_join(GroupOverallResponse,
-                           by = c("group", "frequency", "severity", "tsf"))
-      )
+        dplyr::left_join(GroupOverallResponse,
+                         by = c("group", "frequency", "severity", "tsf"))
+    )
 
-      if(nrow(zibeta_pars) != 2) {
-        stop("Bummer! Problem when trying to interpolate for TSF value ", target_tsf)
-      }
-
-      nshape <- sum(!is.na(zibeta_pars$shape1))
-      if (nshape == 2) {
-        # Both neighbouring fire regimes have beta shape parameters
-        dat_beta_undef$pzero[j] <- with(zibeta_pars, sum(wt * pzero))
-        dat_beta_undef$shape1[j] <- with(zibeta_pars, sum(wt * shape1))
-        dat_beta_undef$shape2[j] <- with(zibeta_pars, sum(wt * shape2))
-
-      } else if (nshape == 1) {
-        # One regime missing shape parameters - must be high pzero value.
-        # Fall back to sampling the component triangular distributions for
-        # both enclosing regimes and deriving a weighted mixture.
-        N <- 1e4
-        tri <- with(zibeta_pars,
-                    get_tri_samples(group[1], frequency[1], severity[1], tsf[1], nsamples=N))
-
-        tri2 <- with(zibeta_pars,
-                     get_tri_samples(group[2], frequency[2], severity[2], tsf[2], nsamples=N))
-
-        # Weighted mixture
-        b <- runif(N) < zibeta_pars$wt[1]
-        tri <- rbind(tri[b,], tri2[!b,])
-
-        # Overall response values calculated using default function (with default args)
-        overall <- .FUN_OVERALL(tri)
-
-        pars <- .do_find_zibeta_approximation(overall, pzero_threshold = 0.99)
-
-        dat_beta_undef$pzero[j] <- pars['pzero']
-        dat_beta_undef$shape1[j] <- pars['shape1']
-        dat_beta_undef$shape2[j] <- pars['shape2']
-
-      } else {
-        # Neither enclosing regime has shape parameters.
-        # Set pzero to 1.0 and both shape parameters to 1.0 so
-        # something can be drawn by graph functions
-        # (TODO: better way?)
-        dat_beta_undef$pzero[j] <- 1.0
-        dat_beta_undef$shape1[j] <- 1.0
-        dat_beta_undef$shape2[j] <- 1.0
-      }
+    if(nrow(zibeta_pars) != 2) {
+      stop("Bummer! Problem when trying to interpolate for TSF value ", target_tsf)
     }
-  } else {  # not interpolating
-    dat_beta_undef <- NULL
+
+    nshape <- sum(!is.na(zibeta_pars$shape1))
+    if (nshape == 2) {
+      # Both neighbouring fire regimes have beta shape parameters
+      dat_beta_undef$pzero[j] <- with(zibeta_pars, sum(wt * pzero))
+      dat_beta_undef$shape1[j] <- with(zibeta_pars, sum(wt * shape1))
+      dat_beta_undef$shape2[j] <- with(zibeta_pars, sum(wt * shape2))
+
+    } else if (nshape == 1) {
+      # One regime missing shape parameters - must be high pzero value.
+      # Fall back to sampling the component triangular distributions for
+      # both enclosing regimes and deriving a weighted mixture.
+      N <- 1e4
+      tri <- with(zibeta_pars,
+                  get_tri_samples(group[1], frequency[1], severity[1], tsf[1], nsamples=N))
+
+      tri2 <- with(zibeta_pars,
+                   get_tri_samples(group[2], frequency[2], severity[2], tsf[2], nsamples=N))
+
+      # Weighted mixture
+      b <- runif(N) < zibeta_pars$wt[1]
+      tri <- rbind(tri[b,], tri2[!b,])
+
+      # Overall response values calculated using default function (with default args)
+      overall <- .FUN_OVERALL(tri)
+
+      pars <- .do_find_zibeta_approximation(overall, pzero_threshold = 0.99)
+
+      dat_beta_undef$pzero[j] <- pars['pzero']
+      dat_beta_undef$shape1[j] <- pars['shape1']
+      dat_beta_undef$shape2[j] <- pars['shape2']
+
+    } else {
+      # Neither enclosing regime has shape parameters.
+      # Set pzero to 1.0 and both shape parameters to 1.0 so
+      # something can be drawn by graph functions
+      # (TODO: better way?)
+      dat_beta_undef$pzero[j] <- 1.0
+      dat_beta_undef$shape1[j] <- 1.0
+      dat_beta_undef$shape2[j] <- 1.0
+    }
   }
 
   # Return parameters

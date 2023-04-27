@@ -10,7 +10,6 @@ get_overall_response_data(
   severity,
   tsf,
   cross = TRUE,
-  interpolation = TRUE,
   dx = 0.005
 )
 }
@@ -36,18 +35,12 @@ values will result in 12 fire regimes. If \code{FALSE}, a fire regime
 \emph{i} is defined by the \emph{i}th element of each of the three
 component vectors. In this case, the vectors must all have the same length.}
 
-\item{interpolation}{If \code{TRUE} (default), interpolation will be performed
-for any combinations of frequency, severity and time since fire values that
-do not appear in the \code{GroupOverallResponse} look-up table. If
-\code{FALSE}, a warning message will be issued for such combinations and no
-data returned for them.}
-
 \item{dx}{Increment for relative abundance values.}
 }
 \value{
 A data frame suitable for use with ggplot, with columns:
-  group; frequency; severity; tsf; relabund; density; density_adjusted;
-  regime.
+  group; frequency; severity; tsf; relabund (sequence of values from 0 to 1);
+  density; regime (character label).
 }
 \description{
 This is a convenience function that creates a data frame suitable for
@@ -61,10 +54,11 @@ Where a requested combination of frequency, severity and time since fire does
 not exist in the \code{GroupOverallResponse} look-up table, the overall
 response will be derived as the weighted mixture of beta distributions for
 the nearest defined combinations. At the moment, this interpolation between
-values is relevant to time since fire, since all integer values for frequency
-and severity between zero and the maximum values considered during
+values only applies to time since fire, since all integer values for
+frequency and severity between zero and the maximum values considered during
 expert-elicitation are represented in the look-up table.
 }
 \seealso{
-\code{\link{draw_overall_response}}
+\code{\link{draw_overall_response}} which calls this function and
+  graphs the results.
 }
