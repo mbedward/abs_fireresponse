@@ -1,3 +1,124 @@
+#' Convert FESM integer fire severity values to scale used for expert-elicited
+#' data
+#'
+#' The FESM scale of fire severity comprises integers in the range 0-5, where 0
+#' is unburnt; 2 is low; 3 is moderate; 4 is high; and 5 is extreme. This
+#' function transforms these values to the 0-8 scale used in the expert-elicited
+#' data for functional group responses, such that FESM values \code{(0,2,3,4,5)}
+#' are mapped to expert values \code{(0,2,4,6,8)}.
+#'
+#' Values of 1 (referred to as 'reserved class' in FESM documentation) do not
+#' usually occur in FESM data and will be treated as unburnt (0) by this
+#' function.
+#'
+#' @param sev Vector of integer values for FESM fire severity (0-5).
+#'
+#' @return A vector of integer severity values on the expert-elicited scale
+#'   (0-8).
+#'
+#' @examples
+#' # Convert the commonly used FESM values
+#' fesm_to_expert_severity(c(0, 2, 3, 4, 5))
+#'
+#' # Can also convert FESM value of 1 (not normally used)
+#' fesm_to_expert_severity(1)
+#'
+#' @export
+#'
+fesm_to_expert_severity <- function(sev) {
+  if ( !isTRUE(all.equal(sev, trunc(sev))) ) {
+    stop("All input severity values should be integers")
+  }
+
+  if (any(sev < 0 | sev > 5)) stop("All input severity values should be in the range 0-5")
+
+  # Recode any input FESM values of 1 as 0 (unburnt)
+  sev[sev == 1] <- 0
+
+  ifelse(sev <= 2, sev, 2*(sev-1))
+}
+
+
+#' Convert integer fire severity values on the scale used for expert-elicited
+#' data to FESM severity values
+#'
+#' In the expert-elicited data for functional group responses, fire severity
+#' values are coded on a 0-8 scale. This contrasts with the commonly used FESM
+#' scale where severity is coded as: 0 (unburnt); 2 (low); 3 (moderate); 4
+#' (high); 5 (extreme). Expert scale values \code{(0, 2, 4, 6, 8)} map directly
+#' to FESM values \code{(0, 2, 3, 4, 5)}. The remaining expert-scale values
+#' represent intermediate severities: 1 is unburnt/low (between FESM 0 and 2); 3
+#' is low/moderate (between FESM 2 and 3); 5 is moderate/high (between FESM 3
+#' and 4); and 7 is high/extreme (between FESM 4 and 5). The \code{intermediate}
+#' argument can be used to control to handle these values, with options to
+#' return the higher or lower FESM value, or (by default) to stop with an error
+#' if any such values are encountered in the input vector.
+#'
+#' Values of 1 (referred to as 'reserved class' in FESM documentation) do not
+#' usually occur in FESM data and will never be returned by this function.
+#'
+#' @param sev Vector of integer values for fire severity on the 0-8 scale used
+#'   for expert-elicited data.
+#'
+#' @param intermediate A character value that controls how expert-scale values
+#'   \code{(1,3,5,7)} that map to intermediate values on the FESM scale should
+#'   be handled. Options are \code{'error'} (default) to stop with an error if
+#'   the input vector contains any such values; \code{'up'} to map these values
+#'   to the higher corresponding FESM values \code{(2,3,4,5)}; or \code{'down'}
+#'   to map these values to the lower corresponding FESM values
+#'   \code{(0,2,3,4)}. May be abbreviated.
+#'
+#' @return A vector of integer severity values on the FESM scale (0-5).
+#'
+#' @examples
+#' # Expert severity codes that map directly to FESM severity codes.
+#' expert_to_fesm_severity(c(0, 2, 4, 6, 8))  # returns c(0, 2, 3, 4, 5)
+#'
+#' # Allow intermediate expert values and map each to the lower
+#' # corresponding FESM value
+#' expert_to_fesm_severity(c(1, 3, 5, 7), intermediate = "down")
+#'
+#' # Map intermediate values to the upper corresponding FESM values
+#' expert_to_fesm_severity(c(1, 3, 5, 7), intermediate = "up")
+#'
+#' # If the argument intermediate is not 'up' or 'down', any intermediate
+#' # values in the input vector will cause the function to stop with
+#' # an error message
+#' \dontrun{
+#' expert_to_fesm_severity(3)
+#' }
+#'
+#' @export
+#'
+expert_to_fesm_severity <- function(sev, intermediate = c("error", "up", "down")) {
+  if ( !isTRUE(all.equal(sev, trunc(sev))) ) {
+    stop("All input severity values should be integers")
+  }
+
+  if (any(sev < 0 | sev > 8)) stop("All input severity values should be in the expert-elicited range: 0-8")
+
+  intermediate <- match.arg(intermediate)
+  INTERMEDIATE <- c(1,3,5,7)
+
+  if (intermediate == "error") {
+    if (any(INTERMEDIATE %in% sev)) {
+      stop("Input data contains one or more intermediate values (1,3,5,7).\n",
+           "Argument intermediate must be set to 'up' or 'down' to allow such values.")
+    }
+  } else {
+    ii <- sev %in% INTERMEDIATE
+    if (intermediate == "up") {
+      sev[ii] <- sev[ii] + 1
+    } else { # 'down'
+      sev[ii] <- sev[ii] - 1
+    }
+  }
+
+  # Convert to FESM scale values (0, 2:5)
+  ifelse(sev == 0, sev, sev/2 + 1)
+}
+
+
 #' Map predictions for group overall response
 #'
 #' Given a set of raster layers for fire history (frequency, severity, time
@@ -39,15 +160,16 @@
 #'   maximum reference value (currently 10 fires).
 #'
 #' @param rseverity Single-band raster layer (\code{terra::rast} object) with
-#'   integer cell values for the severity of the last fire expressed as FESM
-#'   class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme). Note
-#'   that FESM class 1 (reserved) is not generally used and will be treated as
-#'   unburnt if it appears in the raster. FESM values will be transformed to the
-#'   scale used for severity in the expert-elicited data (0-8), such that FESM
-#'   values 3, 4 and 5 map to expert scale values 4, 6, and 8. Any raster values
-#'   outside the valid range for FESM will result in the function terminating
-#'   with an error message warning message being issued and \code{NA} values
-#'   being written to the output rasters.
+#'   integer cell values for the severity of the last fire. By default, cell values are assumed to be
+#'   FESM class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme).
+#'   Note that FESM class 1 (reserved) is not generally used and will be treated
+#'   as unburnt if it appears in the raster. FESM values will be transformed to
+#'   the scale used for severity in the expert-elicited data (0-8), such that
+#'   FESM values 3, 4 and 5 map to expert scale values 4, 6, and 8. If the
+#'   raster cell values are already on the scale used for expert-elicited data,
+#'   this can be indicated by setting the \code{severity_scale} argument (see
+#'   below). With either scale, if any raster values are encourtered that are
+#'   outside the valid range, the function will terminate with an error message.
 #'
 #' @param rtsf Single-band raster layer (\code{terra::rast} object) with
 #'   integer cell values for time (years) since the last fire. Any values
@@ -70,6 +192,11 @@
 #'   an empty string or \code{NULL} is provided, the output raster will be
 #'   returned as a \code{terra::rast} object linked to a temporary file, which
 #'   can be then be saved using the \code{terra::writeRaster} function directly.
+#'
+#' @param severity_scale (character) Either \code{'FESM'} (default) to indicate
+#'   that severity raster values are on the FESM (0-5) scale, or \code{'Expert'}
+#'   to indicate that value are on the 0-8 scale used for the expert-elicited
+#'   data. Case-insensitive and may be abbreviated.
 #'
 #' @param cores The number of parallel cores to use for raster processing.
 #'   Default is 1 for sequential processing on a single core. If multiple cores
@@ -98,6 +225,7 @@ predict_raster <- function(group,
                            rfrequency, rseverity, rtsf,
                            probs = c(0.05, 0.5, 0.95),
                            filename = sprintf("group%02d_overall.tif", group),
+                           severity_scale = c("FESM", "Expert"),
                            ncores = 1,
                            quiet = FALSE) {
 
@@ -122,6 +250,12 @@ predict_raster <- function(group,
 
     stop("The input fire history rasters have differing extents and/or projections")
   }
+
+  # Selected severity scale - allowing for variable case and partial strings
+  ptn <- paste0("^", tolower(severity_scale[1]))
+  i <- grep(ptn, c("fesm", "expert"))
+  if (length(i) != 1) stop("Unknown option for argument severity_scale: ", severity_scale[1])
+  is_FESM_scale <- i == 1
 
   # Check probability values for requested quantiles
   if (length(probs) == 0 || is.null(probs) || (length(probs) == 1 && is.na(probs))) {
@@ -170,18 +304,28 @@ predict_raster <- function(group,
   # limits of expert look-up data for each fire regime component
   LIMS <- apply(GroupOverallResponse[, c("frequency", "severity", "tsf")], MARGIN=2, max)
 
+  if (is_FESM_scale) {
+    # Expert-scale values that map directly to FESM values
+    SEVERITIES <- c(0, 2, 4, 6, 8)
+  } else {
+    SEVERITIES <- 0:LIMS['severity']
+  }
+
   group_params <- get_zibeta_parameters(grp = group,
                                         frequency = 0:LIMS['frequency'],
-                                        severity = c(0,2,4,6,8),  # Constrained to values than map to FESM
-                                        tsf = 0:LIMS['tsf']) %>%
+                                        severity = SEVERITIES,
+                                        tsf = 0:LIMS['tsf'])
 
-    # Recode 0-8 severity values in expert data to standard FESM values
-    dplyr::mutate(severity = ifelse(severity <= 2, severity, severity/2 + 1))
+  if (is_FESM_scale) {
+    # Recode severity values in expert data to standard FESM values
+    group_params <- group_params %>%
+      dplyr::mutate(severity = ifelse(severity <= 2, severity, severity/2 + 1))
+  }
 
   # If quantiles were requested, add them to the look-up table
   if (length(q_names) > 0) {
 
-    # Old school code is simpler for this bit than dplyr `do` or `reframe`
+    # Old school code is easier for this bit than dplyr `do` or `reframe`
     qdat <- apply(group_params[, c("pzero", "shape1", "shape2")], MARGIN = 1, function(pars) {
       q <- qzibeta(probs, pzero=pars[1], shape1=pars[2], shape2=pars[3])
       names(q) <- q_names

@@ -11,6 +11,7 @@ predict_raster(
   rtsf,
   probs = c(0.05, 0.5, 0.95),
   filename = sprintf("group\%02d_overall.tif", group),
+  severity_scale = c("FESM", "Expert"),
   ncores = 1,
   quiet = FALSE
 )
@@ -25,15 +26,16 @@ look-up table (\code{\link{GroupOverallResponse}}) will be clamped to the
 maximum reference value (currently 10 fires).}
 
 \item{rseverity}{Single-band raster layer (\code{terra::rast} object) with
-integer cell values for the severity of the last fire expressed as FESM
-class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme). Note
-that FESM class 1 (reserved) is not generally used and will be treated as
-unburnt if it appears in the raster. FESM values will be transformed to the
-scale used for severity in the expert-elicited data (0-8), such that FESM
-values 3, 4 and 5 map to expert scale values 4, 6, and 8. Any raster values
-outside the valid range for FESM will result in the function terminating
-with an error message warning message being issued and \code{NA} values
-being written to the output rasters.}
+integer cell values for the severity of the last fire. By default, cell values are assumed to be
+FESM class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme).
+Note that FESM class 1 (reserved) is not generally used and will be treated
+as unburnt if it appears in the raster. FESM values will be transformed to
+the scale used for severity in the expert-elicited data (0-8), such that
+FESM values 3, 4 and 5 map to expert scale values 4, 6, and 8. If the
+raster cell values are already on the scale used for expert-elicited data,
+this can be indicated by setting the \code{severity_scale} argument (see
+below). With either scale, if any raster values are encourtered that are
+outside the valid range, the function will terminate with an error message.}
 
 \item{rtsf}{Single-band raster layer (\code{terra::rast} object) with
 integer cell values for time (years) since the last fire. Any values
@@ -56,6 +58,11 @@ value of the \code{group} argument, e.g. \code{'group01_overall.tif'}. If
 an empty string or \code{NULL} is provided, the output raster will be
 returned as a \code{terra::rast} object linked to a temporary file, which
 can be then be saved using the \code{terra::writeRaster} function directly.}
+
+\item{severity_scale}{(character) Either \code{'FESM'} (default) to indicate
+that severity raster values are on the FESM (0-5) scale, or \code{'Expert'}
+to indicate that value are on the 0-8 scale used for the expert-elicited
+data. Case-insensitive and may be abbreviated.}
 
 \item{quiet}{Logical. If \code{TRUE}, no progress messages will be written to
 the console. The default is \code{FALSE}.}
