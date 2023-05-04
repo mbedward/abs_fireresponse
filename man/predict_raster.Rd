@@ -117,12 +117,11 @@ specified uniform severity over the entire area; or (c) a future fire in
 which severity varies over the study area. See Details (below) for how such
 future fire predictions are made. Raster processing is performed using
 \code{terra} package functions and will be run on parallel cores if these are
-available. The three input raster layers (plus the optional future fire
-severity raster if applicable) must be spatially aligned, i.e. have identical
-extent and map projection. This can be checked with the \code{terra} package
-function \code{\link[terra]{compareGeom}}. The raster cell size is allowed to
-differ between layers although it's probably best to avoid this whenever
-possible.
+available. The three input raster layers must be spatially aligned, i.e. have
+exactly the same extent and map projection. This can be checked with the
+\code{terra} package function \code{\link[terra]{compareGeom}}. The raster
+cell size is allowed to differ between layers although it's probably best to
+avoid this whenever possible.
 }
 \details{
 Predictions can be made for future fire scenarios in one of two ways.
