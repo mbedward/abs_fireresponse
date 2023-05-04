@@ -316,6 +316,7 @@ get_zibeta_parameters <- function(grp,
                                   frequency, severity, tsf,
                                   cross = TRUE) {
 
+  checkmate::assert_int(grp)
 
   # Initial validity checks
   ok <- .group_is_defined(grp)

@@ -9,6 +9,8 @@ predict_raster(
   rfrequency,
   rseverity,
   rtsf,
+  next_time = NULL,
+  next_severity = NULL,
   probs = c(0.05, 0.5, 0.95),
   filename = sprintf("group\%02d_overall.tif", group),
   severity_scale = c("FESM", "Expert"),
@@ -17,7 +19,7 @@ predict_raster(
 )
 }
 \arguments{
-\item{group}{Group}
+\item{group}{Functional group integer ID.}
 
 \item{rfrequency}{Single-band raster layer (\code{terra::rast} object) with
 integer cell values for fire frequency in the preceding fifty year period.
@@ -26,22 +28,37 @@ look-up table (\code{\link{GroupOverallResponse}}) will be clamped to the
 maximum reference value (currently 10 fires).}
 
 \item{rseverity}{Single-band raster layer (\code{terra::rast} object) with
-integer cell values for the severity of the last fire. By default, cell values are assumed to be
-FESM class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme).
-Note that FESM class 1 (reserved) is not generally used and will be treated
-as unburnt if it appears in the raster. FESM values will be transformed to
-the scale used for severity in the expert-elicited data (0-8), such that
-FESM values 3, 4 and 5 map to expert scale values 4, 6, and 8. If the
-raster cell values are already on the scale used for expert-elicited data,
-this can be indicated by setting the \code{severity_scale} argument (see
-below). With either scale, if any raster values are encourtered that are
-outside the valid range, the function will terminate with an error message.}
+integer cell values for the severity of the last fire. By default, cell
+values are assumed to be FESM severity values (0: unburnt; 2: low; 3:
+moderate; 4: high; 5: extreme). Note that FESM class 1 (reserved) is not
+generally used and will be treated as unburnt (0) if it occurs in the
+raster. FESM values will be transformed to the scale used for severity in
+the expert-elicited data, such that FESM values \code{(0,2,3,4,5)} map to
+expert scale values \code{(0,2,4,6,8)}. If the raster cell values are already on
+the scale used for expert-elicited data, this can be indicated via the
+\code{severity_scale} argument (see below).}
 
 \item{rtsf}{Single-band raster layer (\code{terra::rast} object) with
 integer cell values for time (years) since the last fire. Any values
 greater than the maximum reference value in the expert data look-up table
 (\code{\link{GroupOverallResponse}}) will be clamped to the maximum
 reference value (currently 40 years).}
+
+\item{next_time}{Time (integer years) for a future fire scenario. If provided
+and \code{next_severity} is \code{NULL}, the value will be added to the
+time since fire value for all non-missing cells in raster \code{rtsf} to
+simulate an expected fire-free period. If \code{next_severity} is also
+provided, then \code{next_time} is taken as the time from present at which
+the future fire burning all raster cells with that severity will occur. In
+the latter case, group habitat status will be calculated using the two-step
+process described in the Details section.}
+
+\item{next_severity}{Severity of a hypothetical future fire. If this argument
+is provided together with a value for \code{next_time}, group habitat
+status will be calculated using the two-step process described in the
+Details section. Note: this value must be an integer greater than zero
+referring to a severity class on the scale specified via the
+\code{severity_scale} argument (see below).}
 
 \item{probs}{Numeric vector of one or more probability values for the overall
 response quantiles to return. The default is a named vector:
@@ -61,8 +78,10 @@ can be then be saved using the \code{terra::writeRaster} function directly.}
 
 \item{severity_scale}{(character) Either \code{'FESM'} (default) to indicate
 that severity raster values are on the FESM (0-5) scale, or \code{'Expert'}
-to indicate that value are on the 0-8 scale used for the expert-elicited
-data. Case-insensitive and may be abbreviated.}
+to indicate that values are on the 0-8 scale used for expert-elicited data.
+Case-insensitive and may be abbreviated. Note: this argument applies to
+both the severity raster \code{rseverity} as well as the value of
+\code{next_severity}, if provided.}
 
 \item{quiet}{Logical. If \code{TRUE}, no progress messages will be written to
 the console. The default is \code{FALSE}.}
@@ -84,35 +103,51 @@ A \code{terra::rast} raster with one layer for the probability of
 }
 \description{
 Given a set of raster layers for fire history (frequency, severity, time
-since fire), this function identifies the distribution of group overall
-response values corresponding to the fire regime for each raster cell and
-returns requested quantiles of that distribution plus the probability of the
-overall response being zero. Output is a raster with a band for each quantile
-plus a band for the probability of a zero value (see details). The default
-quantiles are \code{c(0.05, 0.5, 0.95)}, i.e. the median and central 90\%
-bounds. Raster processing is performed using \code{terra} package functions
-and will be run on parallel cores if these are available. The three input
-raster layers must be spatially aligned, i.e. have identical extent and map
-projection. This can be checked with the \code{terra} package function
-\code{\link[terra]{compareGeom}}. The raster cell size is allowed to differ
-between layers although it's probably best to avoid this whenever possible.
+since fire), this function maps predicted values of overall response for a
+given functional group. These values can be thought of as habitat quality due
+to fire regime (0-1 scale).  For each raster cell, the prediction is based on
+fire frequency over the past 50 years, severity of the most recent fire, and
+time since last fire. Predictions are mapped as a set of output rasters (e.g.
+median value plus 5\% and 95\% quantiles for lower and upper 90% bounds on
+the prediction) as specified using the \code{probs} argument. An additional
+raster for the probability of zero habitat quality is always produced.
+Optionally, predictions can be mapped for a future fire scenario: either (a)
+no fire for a given number of years from the present; (b) a future fire of
+specified uniform severity over the entire area; or (c) a future fire in
+which severity varies over the study area. See Details (below) for how such
+future fire predictions are made. Raster processing is performed using
+\code{terra} package functions and will be run on parallel cores if these are
+available. The three input raster layers (plus the optional future fire
+severity raster if applicable) must be spatially aligned, i.e. have identical
+extent and map projection. This can be checked with the \code{terra} package
+function \code{\link[terra]{compareGeom}}. The raster cell size is allowed to
+differ between layers although it's probably best to avoid this whenever
+possible.
 }
 \details{
-The overall response of a group to a particular fire regime, defined in terms
-of fire frequency (preceding fifty year period), severity of the most recent
-fire, and time since last fire (years), is treated as a zero-inflated (ZI-)
-beta distribution described by three parameters: \code{pzero} (probability of
-zero value); \code{shape1, shape2} (parameters of the beta distribution that
-represents values greater than zero). The ZI-beta distribution is derived
-from combining the three triangular distributions that represent the
-expert-elicited estimates of the group's response to each of the fire regime
-components. The zero-inflated beta is technically a hurdle model, so the
-ZI-beta distribution can be interpreted in two parts: the probability of
-relative abundance or habitat suitability being zero; and the distribution of
-likely values if habitat suitability is greater than zero. For cases where
-the probability of zero is substantial, one or more the quantiles summarizing
-the distribution will be zero, e.g. if \code{pzero > 0.5} then the median
-value and any lower quantiles will all be zero.
+Predictions can be made for future fire scenarios in one of two ways.
+Firstly, a prediction for group habitat status after a period of N years from
+the present with no additional fire can be made by setting argument
+\code{next_time} to an integer value greater than zero, e.g.
+\code{next_time=5} for a fire-free period of 5 years. For this case, the
+function simply adds the value \code{N} to the value of each cell in the
+\code{rtsf} input raster, other than cells with missing (\code{NA}) values.
+
+Secondly, a prediction can be made for habitat quality given a future fire in
+N years time, specified via argument \code{next_time}, and with uniform
+severity, specified via argument \code{next_severity}. As with the first
+option, only those cells that have non-missing values for their actual time
+since fire in the \code{rtsf} layer will be considered. The value of
+\code{next_time} can be 0, to simulate the additional fire this year, or an
+integer N greater than 0 for a fire in N years time. With this option,
+habitat quality is first calculated for the actual fire history of each
+raster cell (i.e. based on the values in the three input rasters), and then
+the modifying effect of the additional fire is calculated. This two-step
+process is intended to avoid unrealistic predictions that could otherwise
+result. For example, if a cell currently has low or zero habitat quality
+because it was recently burnt at high severity, a further low severity burn
+could appear to greatly increase the habitat quality if the calculation was
+only based on the severity of the most recent fire.
 }
 \seealso{
 \code{\link{qzibeta}} for calculating quantiles of a ZI-beta

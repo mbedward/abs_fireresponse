@@ -122,36 +122,52 @@ expert_to_fesm_severity <- function(sev, intermediate = c("error", "up", "down")
 #' Map predictions for group overall response
 #'
 #' Given a set of raster layers for fire history (frequency, severity, time
-#' since fire), this function identifies the distribution of group overall
-#' response values corresponding to the fire regime for each raster cell and
-#' returns requested quantiles of that distribution plus the probability of the
-#' overall response being zero. Output is a raster with a band for each quantile
-#' plus a band for the probability of a zero value (see details). The default
-#' quantiles are \code{c(0.05, 0.5, 0.95)}, i.e. the median and central 90\%
-#' bounds. Raster processing is performed using \code{terra} package functions
-#' and will be run on parallel cores if these are available. The three input
-#' raster layers must be spatially aligned, i.e. have identical extent and map
-#' projection. This can be checked with the \code{terra} package function
-#' \code{\link[terra]{compareGeom}}. The raster cell size is allowed to differ
-#' between layers although it's probably best to avoid this whenever possible.
+#' since fire), this function maps predicted values of overall response for a
+#' given functional group. These values can be thought of as habitat quality due
+#' to fire regime (0-1 scale).  For each raster cell, the prediction is based on
+#' fire frequency over the past 50 years, severity of the most recent fire, and
+#' time since last fire. Predictions are mapped as a set of output rasters (e.g.
+#' median value plus 5\% and 95\% quantiles for lower and upper 90% bounds on
+#' the prediction) as specified using the \code{probs} argument. An additional
+#' raster for the probability of zero habitat quality is always produced.
+#' Optionally, predictions can be mapped for a future fire scenario: either (a)
+#' no fire for a given number of years from the present; (b) a future fire of
+#' specified uniform severity over the entire area; or (c) a future fire in
+#' which severity varies over the study area. See Details (below) for how such
+#' future fire predictions are made. Raster processing is performed using
+#' \code{terra} package functions and will be run on parallel cores if these are
+#' available. The three input raster layers (plus the optional future fire
+#' severity raster if applicable) must be spatially aligned, i.e. have identical
+#' extent and map projection. This can be checked with the \code{terra} package
+#' function \code{\link[terra]{compareGeom}}. The raster cell size is allowed to
+#' differ between layers although it's probably best to avoid this whenever
+#' possible.
 #'
-#' The overall response of a group to a particular fire regime, defined in terms
-#' of fire frequency (preceding fifty year period), severity of the most recent
-#' fire, and time since last fire (years), is treated as a zero-inflated (ZI-)
-#' beta distribution described by three parameters: \code{pzero} (probability of
-#' zero value); \code{shape1, shape2} (parameters of the beta distribution that
-#' represents values greater than zero). The ZI-beta distribution is derived
-#' from combining the three triangular distributions that represent the
-#' expert-elicited estimates of the group's response to each of the fire regime
-#' components. The zero-inflated beta is technically a hurdle model, so the
-#' ZI-beta distribution can be interpreted in two parts: the probability of
-#' relative abundance or habitat suitability being zero; and the distribution of
-#' likely values if habitat suitability is greater than zero. For cases where
-#' the probability of zero is substantial, one or more the quantiles summarizing
-#' the distribution will be zero, e.g. if \code{pzero > 0.5} then the median
-#' value and any lower quantiles will all be zero.
+#' Predictions can be made for future fire scenarios in one of two ways.
+#' Firstly, a prediction for group habitat status after a period of N years from
+#' the present with no additional fire can be made by setting argument
+#' \code{next_time} to an integer value greater than zero, e.g.
+#' \code{next_time=5} for a fire-free period of 5 years. For this case, the
+#' function simply adds the value \code{N} to the value of each cell in the
+#' \code{rtsf} input raster, other than cells with missing (\code{NA}) values.
 #'
-#' @param group Group
+#' Secondly, a prediction can be made for habitat quality given a future fire in
+#' N years time, specified via argument \code{next_time}, and with uniform
+#' severity, specified via argument \code{next_severity}. As with the first
+#' option, only those cells that have non-missing values for their actual time
+#' since fire in the \code{rtsf} layer will be considered. The value of
+#' \code{next_time} can be 0, to simulate the additional fire this year, or an
+#' integer N greater than 0 for a fire in N years time. With this option,
+#' habitat quality is first calculated for the actual fire history of each
+#' raster cell (i.e. based on the values in the three input rasters), and then
+#' the modifying effect of the additional fire is calculated. This two-step
+#' process is intended to avoid unrealistic predictions that could otherwise
+#' result. For example, if a cell currently has low or zero habitat quality
+#' because it was recently burnt at high severity, a further low severity burn
+#' could appear to greatly increase the habitat quality if the calculation was
+#' only based on the severity of the most recent fire.
+#'
+#' @param group Functional group integer ID.
 #'
 #' @param rfrequency Single-band raster layer (\code{terra::rast} object) with
 #'   integer cell values for fire frequency in the preceding fifty year period.
@@ -160,22 +176,37 @@ expert_to_fesm_severity <- function(sev, intermediate = c("error", "up", "down")
 #'   maximum reference value (currently 10 fires).
 #'
 #' @param rseverity Single-band raster layer (\code{terra::rast} object) with
-#'   integer cell values for the severity of the last fire. By default, cell values are assumed to be
-#'   FESM class values (0: unburnt; 2: low; 3: moderate; 4: high; 5: extreme).
-#'   Note that FESM class 1 (reserved) is not generally used and will be treated
-#'   as unburnt if it appears in the raster. FESM values will be transformed to
-#'   the scale used for severity in the expert-elicited data (0-8), such that
-#'   FESM values 3, 4 and 5 map to expert scale values 4, 6, and 8. If the
-#'   raster cell values are already on the scale used for expert-elicited data,
-#'   this can be indicated by setting the \code{severity_scale} argument (see
-#'   below). With either scale, if any raster values are encourtered that are
-#'   outside the valid range, the function will terminate with an error message.
+#'   integer cell values for the severity of the last fire. By default, cell
+#'   values are assumed to be FESM severity values (0: unburnt; 2: low; 3:
+#'   moderate; 4: high; 5: extreme). Note that FESM class 1 (reserved) is not
+#'   generally used and will be treated as unburnt (0) if it occurs in the
+#'   raster. FESM values will be transformed to the scale used for severity in
+#'   the expert-elicited data, such that FESM values \code{(0,2,3,4,5)} map to
+#'   expert scale values \code{(0,2,4,6,8)}. If the raster cell values are already on
+#'   the scale used for expert-elicited data, this can be indicated via the
+#'   \code{severity_scale} argument (see below).
 #'
 #' @param rtsf Single-band raster layer (\code{terra::rast} object) with
 #'   integer cell values for time (years) since the last fire. Any values
 #'   greater than the maximum reference value in the expert data look-up table
 #'   (\code{\link{GroupOverallResponse}}) will be clamped to the maximum
 #'   reference value (currently 40 years).
+#'
+#' @param next_time Time (integer years) for a future fire scenario. If provided
+#'   and \code{next_severity} is \code{NULL}, the value will be added to the
+#'   time since fire value for all non-missing cells in raster \code{rtsf} to
+#'   simulate an expected fire-free period. If \code{next_severity} is also
+#'   provided, then \code{next_time} is taken as the time from present at which
+#'   the future fire burning all raster cells with that severity will occur. In
+#'   the latter case, group habitat status will be calculated using the two-step
+#'   process described in the Details section.
+#'
+#' @param next_severity Severity of a hypothetical future fire. If this argument
+#'   is provided together with a value for \code{next_time}, group habitat
+#'   status will be calculated using the two-step process described in the
+#'   Details section. Note: this value must be an integer greater than zero
+#'   referring to a severity class on the scale specified via the
+#'   \code{severity_scale} argument (see below).
 #'
 #' @param probs Numeric vector of one or more probability values for the overall
 #'   response quantiles to return. The default is a named vector:
@@ -195,8 +226,10 @@ expert_to_fesm_severity <- function(sev, intermediate = c("error", "up", "down")
 #'
 #' @param severity_scale (character) Either \code{'FESM'} (default) to indicate
 #'   that severity raster values are on the FESM (0-5) scale, or \code{'Expert'}
-#'   to indicate that value are on the 0-8 scale used for the expert-elicited
-#'   data. Case-insensitive and may be abbreviated.
+#'   to indicate that values are on the 0-8 scale used for expert-elicited data.
+#'   Case-insensitive and may be abbreviated. Note: this argument applies to
+#'   both the severity raster \code{rseverity} as well as the value of
+#'   \code{next_severity}, if provided.
 #'
 #' @param cores The number of parallel cores to use for raster processing.
 #'   Default is 1 for sequential processing on a single core. If multiple cores
@@ -223,6 +256,8 @@ expert_to_fesm_severity <- function(sev, intermediate = c("error", "up", "down")
 #'
 predict_raster <- function(group,
                            rfrequency, rseverity, rtsf,
+                           next_time = NULL,
+                           next_severity = NULL,
                            probs = c(0.05, 0.5, 0.95),
                            filename = sprintf("group%02d_overall.tif", group),
                            severity_scale = c("FESM", "Expert"),
@@ -233,15 +268,14 @@ predict_raster <- function(group,
     stop("The terra package needs to be installed to use this function")
   }
 
-  if (length(group) > 1) {
-    warning("More than one group specified but predictions will only be returned for the first.",
-            immediate. = TRUE)
-    group <- group[1]
-  }
+  # limits of expert look-up data for each fire regime component
+  LIMS <- apply(GroupOverallResponse[, c("frequency", "severity", "tsf")], MARGIN=2, max)
 
-  if (!.group_is_defined(group)) {
-    msg <- glue::glue("Group {group} is not defined in the expert data table GroupOverallResponse")
-  }
+  checkmate::assert_int(group, lower=1, upper=max(get_group_ids()))
+
+  .assert_rast_or_int(rfrequency)
+  .assert_rast_or_int(rseverity)
+  .assert_rast_or_int(rtsf)
 
   # Check rasters are fully aligned
   if (!terra::compareGeom(rfrequency, rseverity, rtsf,
@@ -251,38 +285,88 @@ predict_raster <- function(group,
     stop("The input fire history rasters have differing extents and/or projections")
   }
 
+  if (!is.null(next_time)) {
+    checkmate::assert_int(next_time, lower=0)
+  }
+
+  if (!is.null(next_severity)) {
+    # In case next_time was NULL for the check above
+    if (is.null(next_time)) stop("Using next_severity but argument next_time has not been set")
+
+    checkmate::assert_int(next_severity, lower=1)
+  }
+
+  if (is.null(probs)) {
+    qnames = character(0)
+
+  } else {
+    checkmate::assert_numeric(probs, lower=0, upper = 1, any.missing = FALSE)
+
+    if (length(unique(probs)) < length(probs)) {
+      stop("One or more duplicate values supplied to argument 'probs'")
+    }
+
+    # Check and/or set probs element names to use for output layers
+    if (length(probs) > 0) {
+      q_names <- unique(names(probs))        # will be NULL if there are no element names
+      num_names <- length(na.omit(q_names))  # will be zero ...
+
+      if (num_names > 0) {
+        if (num_names < length(probs)) {
+          # Some problem with the supplied names
+          msg <- glue::glue("Some, but not all, element names for argument 'probs' are either
+                         missing or duplicated. Setting default names for output layers.")
+          warning(msg, immediate. = TRUE)
+
+          q_names <- NULL
+        }
+      }
+
+      if (is.null(q_names)) q_names <- sprintf("q%g", probs)
+    }
+  }
+
   # Selected severity scale - allowing for variable case and partial strings
   ptn <- paste0("^", tolower(severity_scale[1]))
   i <- grep(ptn, c("fesm", "expert"))
   if (length(i) != 1) stop("Unknown option for argument severity_scale: ", severity_scale[1])
   is_FESM_scale <- i == 1
 
-  # Check probability values for requested quantiles
-  if (length(probs) == 0 || is.null(probs) || (length(probs) == 1 && is.na(probs))) {
-    q_names <- character(0)
+  # Valid severity values
+  if (is_FESM_scale) {
+    # Expert-scale values that map directly to FESM values
+    SEVERITIES <- c(0, 2, 4, 6, 8)
   } else {
-    if (anyNA(probs) || (!all(probs > 0 & probs < 1))) {
-      stop("All values for argument 'probs' must be non-NA and in the range 0 < p < 1")
-    }
-
-    if (length(unique(probs)) < length(probs)) {
-      stop("One or more duplicate values supplied to argument 'probs'")
-    }
-
-    # Check probs element names
-    q_names <- unique(names(probs))
-    if (length(q_names) == 0) {
-      # No names provided - make some up
-      q_names <- sprintf("q%g", probs)
-    } else if (length(q_names) < length(probs)) {
-      # Some problem with the supplied names
-      msg <- glue::glue("Some, but not all, element names for argument 'probs' are either
-                       missing or duplicated")
-      stop(msg)
-    }
+    SEVERITIES <- 0:LIMS['severity']
   }
 
-  ncores <- ncores[1]
+  # Now that we know the scale, scale and validate the 'next_severity' value if one
+  # was provided
+  if (!is.null(next_severity)) {
+    if (is_FESM_scale) {
+      ok <- next_severity %in% 1:5
+    } else {
+      ok <- next_severity %in% 1:8
+    }
+
+    if ( !ok ) {
+      msg <- paste("Invalid next_severity value for")
+
+      if (is_FESM_scale) msg <- paste(msg, "FESM scale:")
+      else msg <- paste(msg, "Expert data scale:")
+
+      msg <- paste(msg, next_severity)
+
+      stop(msg)
+    }
+
+    # put next_severity on the expert scale for the look-up
+    # table steps (below)
+    if (is_FESM_scale) next_severity <- fesm_to_expert_severity(next_severity)
+  }
+
+
+  checkmate::assert_int(ncores)
   if (ncores > 1) {
     ncores.available <- parallel::detectCores()
     if (ncores > ncores.available) {
@@ -301,40 +385,100 @@ predict_raster <- function(group,
     message(msg)
   }
 
-  # limits of expert look-up data for each fire regime component
-  LIMS <- apply(GroupOverallResponse[, c("frequency", "severity", "tsf")], MARGIN=2, max)
 
-  if (is_FESM_scale) {
-    # Expert-scale values that map directly to FESM values
-    SEVERITIES <- c(0, 2, 4, 6, 8)
-  } else {
-    SEVERITIES <- 0:LIMS['severity']
-  }
-
+  # Look-up table of distributions for functional group responses for
+  # possible values of the current/realized fire regime
   group_params <- get_zibeta_parameters(grp = group,
                                         frequency = 0:LIMS['frequency'],
                                         severity = SEVERITIES,
                                         tsf = 0:LIMS['tsf'])
 
-  if (is_FESM_scale) {
-    # Recode severity values in expert data to standard FESM values
-    group_params <- group_params %>%
-      dplyr::mutate(severity = ifelse(severity <= 2, severity, severity/2 + 1))
-  }
+  if (is.null(next_severity)) {
+    # Calculate requested quantiles for group status based on the beta
+    # distribution parameters in the group_params table.
+    #
+    if (length(q_names) > 0) {
 
-  # If quantiles were requested, add them to the look-up table
-  if (length(q_names) > 0) {
+      qdat <- apply(group_params[, c("pzero", "shape1", "shape2")], MARGIN = 1, function(pars) {
+        q <- qzibeta(probs, pzero=pars[1], shape1=pars[2], shape2=pars[3])
+        names(q) <- q_names
+        q
+      })
 
-    # Old school code is easier for this bit than dplyr `do` or `reframe`
-    qdat <- apply(group_params[, c("pzero", "shape1", "shape2")], MARGIN = 1, function(pars) {
-      q <- qzibeta(probs, pzero=pars[1], shape1=pars[2], shape2=pars[3])
-      names(q) <- q_names
-      q
+      group_params <- group_params %>% dplyr::bind_cols( as.data.frame(t(qdat)) )
+    }
+
+  } else {
+    # A value was provided for next_severity, so calculate requested quantiles
+    # and the probability of zero status based on the product of the beta
+    # distribution for the actual fire history and the distribution that
+    # would result from the additional fire occurring `next_time` years from now.
+
+    # First get ZI-beta parameters for all possible future regime states
+    next_params <- group_params %>%
+      dplyr::select(group, frequency) %>%
+
+      dplyr::distinct() %>%
+
+      dplyr::mutate(frequency = frequency + 1,
+                    severity = next_severity,
+                    tsf = next_time) %>%
+
+      # clamp fire frequency to the limit of the expert-data
+      dplyr::filter(frequency <= LIMS['frequency'])
+
+    next_params <- get_zibeta_parameters(grp = group,
+                                         frequency = next_params$frequency,
+                                         severity = next_params$severity,
+                                         tsf = next_params$tsf,
+                                         cross = FALSE) %>%
+      dplyr::mutate(index = dplyr::row_number())
+
+    # Vector of random samples from each 'next' distribution
+    NSAMP <- 1e5
+    set.seed(123)
+
+    next_rand <- lapply(seq_len(nrow(next_params)), function(i) {
+      with(next_params, rzibeta(NSAMP, pzero[i], shape1[i], shape2[i]))
     })
 
-    group_params <- group_params %>% dplyr::bind_cols( as.data.frame(t(qdat)) )
+    # Calculate product of prior and next distributions and record
+    # pzero and requested quantiles
+    res <- lapply(seq_len(nrow(group_params)), function(i) {
+      prior_pzero <- group_params$pzero[i]
+      prior_shape1 <- group_params$shape1[i]
+      prior_shape2 <- group_params$shape2[i]
+
+      r <- rzibeta(NSAMP, prior_pzero, prior_shape1, prior_shape2)
+
+      # Note - clamping frequency to the limit of the expert data here
+      i_next <- which(next_params$frequency == min(LIMS['frequency'], group_params$frequency[i] + 1))
+
+      rprod <- r * next_rand[[i_next]]
+
+      res <- data.frame(next_pzero = mean(rprod == 0))
+
+      if (length(q_names) > 0) {
+        q <- quantile(rprod, probs = probs, names = FALSE)
+        q <- data.frame( t(q) )
+        colnames(q) <- paste("next", q_names, sep = "_")
+      }
+
+      cbind(res, q)
+    })
+
+    res <- do.call(rbind, res)
+    group_params <- cbind(group_params, res)
   }
 
+  if (is_FESM_scale) {
+    # Recode severity values in the look-up table to standard FESM values so
+    # that they will correspond to cell values in the severity raster
+    group_params <- group_params %>%
+      dplyr::mutate(severity = expert_to_fesm_severity(severity))
+
+    if (!is.null(next_severity)) next_severity <- expert_to_fesm_severity(next_severity)
+  }
 
   # Apply prediction function to the input rasters via terra::app
   #
@@ -360,6 +504,9 @@ predict_raster <- function(group,
              max_frequency = LIMS['frequency'],
              max_tsf = LIMS['tsf'],
              q_names = q_names,
+             next_time = next_time,
+             next_severity = next_severity,
+
              cores = ncores,
              filename = filename,
              overwrite = overwrite,
@@ -368,24 +515,34 @@ predict_raster <- function(group,
 
 
 # Private helper function for predict_raster to be used with `terra::app`.
-# First argument x will be a SpatRaster with three layers for frequency, severity and tsf.
+# First argument x will be a vector of integer values for frequency, severity and tsf.
 #
-.fn_do_predict <- function(x, group_params, max_frequency, max_tsf, q_names) {
+.fn_do_predict <- function(x, group_params, max_frequency, max_tsf, q_names, next_time, next_severity) {
   res <- rep(NA_real_, 1 + length(q_names))
+
+  if (is.null(next_time)) next_time <- 0
+
+  if (is.null(next_severity)) {
+    pzero_name <- "pzero"
+  } else {
+    pzero_name <- "next_pzero"
+    q_names <- paste("next", q_names, sep = "_")
+  }
 
   if (!anyNA(x)) {
     # clamp fire frequency values to the limit of the reference data
     x[1] <- min(x[1], max_frequency)
 
     # clamp time since fire values to the limit of the reference data
-    x[3] <- min(x[3], max_tsf)
+    # after adding the value of next_time
+    x[3] <- min(x[3] + next_time, max_tsf)
 
     # Using base R code here rather than dplyr to run on parallel cores
     # without worrying about exports etc.
     i <- which( with(group_params, frequency == x[1] & severity == x[2] & tsf == x[3]) )
 
     if (length(i) == 1) {
-      res <- c(pzero = group_params$pzero[i])
+      res <- c(pzero = group_params[i, pzero_name])
 
       if (length(q_names) > 0) {
         res <- c(res, unlist(group_params[i, q_names]))
@@ -394,4 +551,13 @@ predict_raster <- function(group,
   }
 
   res
+}
+
+
+.assert_rast_or_int <- function(x) {
+  xname <- checkmate::vname(x)
+
+  if (!(checkmate::test_class(x, "SpatRaster") || checkmate::test_int(x, lower = 0))) {
+    stop(xname, "must be either a SpatRaster object or an integer value >= 0")
+  }
 }
