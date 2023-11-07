@@ -4,7 +4,7 @@ Title: Functional Group Responses to Fire Regimes
 Version: 0.1.15
 Date: 2023-05-04
 Authors@R: c(
-  person("Victoria", "Reynolds", role = c("aut", "cre"), email = "victoria.reynolds@environment.nsw.gov.au"),
+  person("Victoria", "Reynolds", role = c("aut", "cre"), email = "victoria.reynolds@unimelb.edu.au"),
   person("Michael", "Bedward", role = "aut", email = "mbedward@uow.edu.au")
   )
 Description: Provides data and functions to predict responses of fauna functional
