@@ -24,7 +24,7 @@ product to the overall response value as:
 A vector of overall response values.
 }
 \description{
-This function can be used with \code{\link{find_zibeta_approximation}} to
+This function can be used with \code{\link{find_zoabeta_approximation}} to
 calculate overall response values based on vectors of values sampled from the
 fire component distributions. It combines the component values as a weighted
 product raised to a power \code{lambda} (default = 1/3).

@@ -27,7 +27,7 @@ any component has a lower value the overall response is set to zero.}
 A vector of overall response values.
 }
 \description{
-This function can be used with \code{\link{find_zibeta_approximation}} to
+This function can be used with \code{\link{find_zoabeta_approximation}} to
 calculate overall response values based on vectors of values sampled from the
 fire component distributions. Overall response values are calculated using a
 heuristic adopted by DPE researchers in which overall response is set to zero
