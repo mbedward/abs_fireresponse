@@ -1,6 +1,6 @@
 #' Combine sampled values from fire component distributions into overall response values
 #'
-#' This function can be used with \code{\link{find_zibeta_approximation}} to
+#' This function can be used with \code{\link{find_zoabeta_approximation}} to
 #' calculate overall response values based on vectors of values sampled from the
 #' fire component distributions. It combines the component values as a weighted
 #' product raised to a power \code{lambda} (default = 1/3).
@@ -39,7 +39,7 @@
 
 #' Combine sampled values from fire component distributions into overall response values
 #'
-#' This function can be used with \code{\link{find_zibeta_approximation}} to
+#' This function can be used with \code{\link{find_zoabeta_approximation}} to
 #' calculate overall response values based on vectors of values sampled from the
 #' fire component distributions. Overall response values are calculated using a
 #' heuristic adopted by DPE researchers in which overall response is set to zero
@@ -116,11 +116,11 @@
 #'
 #' @export
 #'
-find_zibeta_approximation <- function(the_group,
-                                      frequency, severity, tsf,
-                                      nsamples = 1e4,
-                                      FUN = .FUN_OVERALL,
-                                      pzero_threshold = 0.99) {
+find_zoabeta_approximation <- function(the_group,
+                                       frequency, severity, tsf,
+                                       nsamples = 1e4,
+                                       FUN = .FUN_OVERALL,
+                                       pzero_threshold = 0.99) {
 
   stopifnot(length(the_group) == 1)
   stopifnot(the_group %in% GroupExpertData$group)
@@ -132,35 +132,7 @@ find_zibeta_approximation <- function(the_group,
   # Calculate overall response value for each sample row
   overall <- FUN(dat_samples)
 
-  .do_find_zibeta_approximation(overall, pzero_threshold)
-}
-
-
-# Private helper function for `find_zibeta_approximation`.
-# Also used by other package functions.
-#
-.do_find_zibeta_approximation <- function(overall, pzero_threshold = 0.99) {
-  # Proportion of zero sample values
-  isz <- overall == 0
-  pzero <- mean(isz)
-
-  # Fit a beta distribution to the non-zero values, if there are enough.
-  shape1 <- NA_real_
-  shape2 <- NA_real_
-  if (pzero <= pzero_threshold) {
-    init_pars = c(mean(overall[!isz]), 1.0)
-    suppressWarnings({
-      o <- optim(par = init_pars, fn = .fn_beta_ll, gr=NULL, x = overall[!isz],
-                 method = "L-BFGS-B",
-                 lower = c(0.01, 0.1), upper = c(0.99, 100))
-      fitted_pars <- o$par
-    })
-
-    shape1 <- fitted_pars[2] * fitted_pars[1]
-    shape2 <- fitted_pars[2] * (1 - fitted_pars[1])
-  }
-
-  c(pzero = pzero, shape1=shape1, shape2=shape2)
+  zoabeta::fit_zoabeta(overall, pzero_threshold)
 }
 
 
@@ -262,18 +234,4 @@ get_tri_samples <- function(the_group,
   dat_samples
 }
 
-
-#### Non-exported helper functions
-
-# Beta distribution density function parameterized via mean and dispersion
-.dbeta2 <- function(x, mu, phi, ...) dbeta(x, phi*mu, phi*(1-mu), ...)
-
-
-# Calculate negative summed log-likelihood given a vector of two beta parameters and a
-# vector of data values
-.fn_beta_ll <- function(pars, x) {
-  mu <- pars[1]
-  phi <- pars[2]
-  -sum(.dbeta2(x, mu, phi, log=TRUE))
-}
 

@@ -8,19 +8,20 @@
 library(dplyr, warn.conflicts = FALSE)
 library(here)
 
-library(doRNG)
 library(doFuture)
-
-registerDoFuture()
-registerDoRNG()
 
 initls <- ls(all.names = TRUE)
 
-# On processing machine
-NCORES <- 50
 
-# On laptop
-# NCORES <- 8
+### IMPORTANT - set the number of parallel cores to use here
+
+# On a high-end processing machine with 50 cores it will take about 15 seconds
+# to process each group.
+# NCORES <- 50
+
+# On laptop or similar use whatever you can find. E.g. On a machine with 8 cores
+# and a 2.8GHz processor it will take about 90 seconds to process each group.
+NCORES <- 8
 
 
 source(here::here("R/beta_approximation.R"))
@@ -49,10 +50,10 @@ GroupOverallResponse <- lapply(sort(unique(GroupExpertData$group)), function(the
 
   plan(multisession, workers = NCORES)
 
-  dat_params <- foreach(i = 1:nrow(dat_combns)) %dopar% {
+  dat_params <- foreach(i = 1:nrow(dat_combns), .options.future = list(seed = TRUE)) %dofuture% {
     vals <- unlist(dat_combns[i,])
 
-    zib_pars <- find_zibeta_approximation(the_group,
+    zib_pars <- find_zoabeta_approximation(the_group,
                                           frequency = vals['frequency'],
                                           severity = vals['severity'],
                                           tsf = vals['tsf'])

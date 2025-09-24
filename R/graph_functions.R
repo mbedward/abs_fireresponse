@@ -30,7 +30,7 @@
 #' @export
 #'
 draw_response_curves <- function(the_group) {
-  dat_gg <- dplyr::filter(GroupExpertData, group == the_group)
+  dat_gg <- dplyr::filter(fireresponse::GroupExpertData, group == the_group)
 
   ggplot(dat_gg, aes(x = value)) +
     geom_ribbon(aes(ymin = ra_lwr, ymax = ra_upr), fill = "darkred", alpha = 0.2) +
@@ -39,11 +39,10 @@ draw_response_curves <- function(the_group) {
 
     scale_x_continuous(breaks = ~round(unique(pretty(.)))) +
 
-    labs(x = "Fire component value", y = "Relative abundance") +
+    labs(x = "Fire component value", y = "Relative suitability") +
 
     facet_wrap(~type, scales = "free_x")
 }
-
 
 
 #' Graph group overall response to fire regime(s)
@@ -228,7 +227,7 @@ get_overall_response_data <- function(grp,
   # Get distribution parameters for the group and regime(s).
   # This function also does validity checks on the input arguments.
   #
-  dat_beta <- get_zibeta_parameters(grp, frequency, severity, tsf, cross)
+  dat_beta <- get_zoabeta_parameters(grp, frequency, severity, tsf, cross)
 
   # Generate data
   dat_ggs <- lapply(seq_len(nrow(dat_beta)), function(j) {
@@ -244,7 +243,10 @@ get_overall_response_data <- function(grp,
     } else {
       # Beta parameters are defined
       dat <- dat %>% dplyr::mutate(
-        density = dzibeta(relabund, dat_beta$pzero[j], dat_beta$shape1[j], dat_beta$shape2[j]) )
+        density = zoabeta::dzoabeta(x = relabund,
+                                    shape1 = dat_beta$shape1[j],
+                                    shape2 = dat_beta$shape2[j],
+                                    pzero = dat_beta$pzero[j]) )
     }
 
     dat
@@ -265,8 +267,8 @@ get_overall_response_data <- function(grp,
 }
 
 
-#' Get parameters for ZIBeta distributions that approximate group overall
-#' response to specified fire regimes
+#' Get parameters for zero-one-augmented beta distributions that approximate
+#' group overall response to specified fire regimes
 #'
 #' Given a set of integer group IDs, and one or more fire regimes defined as
 #' combinations of frequency, severity and time since fire values, this function
@@ -312,9 +314,9 @@ get_overall_response_data <- function(grp,
 #'
 #' @export
 #'
-get_zibeta_parameters <- function(grp,
-                                  frequency, severity, tsf,
-                                  cross = TRUE) {
+get_zoabeta_parameters <- function(grp,
+                                   frequency, severity, tsf,
+                                   cross = TRUE) {
 
   checkmate::assert_int(grp)
 
@@ -341,7 +343,7 @@ get_zibeta_parameters <- function(grp,
   }
 
   # Check that all TSF values are within the valid range
-  MaxTSF <- max(GroupOverallResponse$tsf)
+  MaxTSF <- max(fireresponse::GroupOverallResponse$tsf)
   ok <- tsf >= 0 & tsf <= MaxTSF
   if (any(!ok)) {
     msg <- glue::glue("Time since fire value(s) outside range in reference
@@ -381,7 +383,7 @@ get_zibeta_parameters <- function(grp,
   # look-up table.
   dat_beta_def <- dat_regimes %>%
     # Note: using an inner join drops any undefined regimes.
-    dplyr::inner_join(GroupOverallResponse,
+    dplyr::inner_join(fireresponse::GroupOverallResponse,
                       by = c("group", "frequency", "severity", "tsf"))
 
   # If any group x regime combinations have high pzero and missing beta parameters,
@@ -395,7 +397,7 @@ get_zibeta_parameters <- function(grp,
 
   # Interpolate parameters for undefined regimes.
   #
-  dat_beta_undef <- dplyr::anti_join(dat_regimes, GroupOverallResponse,
+  dat_beta_undef <- dplyr::anti_join(dat_regimes, fireresponse::GroupOverallResponse,
                                      by = c("group", "frequency", "severity", "tsf")) %>%
 
     dplyr::mutate(pzero = NA_real_, shape1 = NA_real_, shape2 = NA_real_)
@@ -405,43 +407,43 @@ get_zibeta_parameters <- function(grp,
     dat_enclosing <- .tsf_enclosing_values(target_tsf)
 
     suppressWarnings(
-      zibeta_pars <- cbind(dat_beta_undef[j, c("group", "frequency", "severity")],
-                           dat_enclosing) %>%
+      zoabeta_pars <- cbind(dat_beta_undef[j, c("group", "frequency", "severity")],
+                            dat_enclosing) %>%
 
-        dplyr::left_join(GroupOverallResponse,
+        dplyr::left_join(fireresponse::GroupOverallResponse,
                          by = c("group", "frequency", "severity", "tsf"))
     )
 
-    if(nrow(zibeta_pars) != 2) {
+    if(nrow(zoabeta_pars) != 2) {
       stop("Bummer! Problem when trying to interpolate for TSF value ", target_tsf)
     }
 
-    nshape <- sum(!is.na(zibeta_pars$shape1))
+    nshape <- sum(!is.na(zoabeta_pars$shape1))
     if (nshape == 2) {
       # Both neighbouring fire regimes have beta shape parameters
-      dat_beta_undef$pzero[j] <- with(zibeta_pars, sum(wt * pzero))
-      dat_beta_undef$shape1[j] <- with(zibeta_pars, sum(wt * shape1))
-      dat_beta_undef$shape2[j] <- with(zibeta_pars, sum(wt * shape2))
+      dat_beta_undef$pzero[j] <- with(zoabeta_pars, sum(wt * pzero))
+      dat_beta_undef$shape1[j] <- with(zoabeta_pars, sum(wt * shape1))
+      dat_beta_undef$shape2[j] <- with(zoabeta_pars, sum(wt * shape2))
 
     } else if (nshape == 1) {
       # One regime missing shape parameters - must be high pzero value.
       # Fall back to sampling the component triangular distributions for
       # both enclosing regimes and deriving a weighted mixture.
       N <- 1e4
-      tri <- with(zibeta_pars,
+      tri <- with(zoabeta_pars,
                   get_tri_samples(group[1], frequency[1], severity[1], tsf[1], nsamples=N))
 
-      tri2 <- with(zibeta_pars,
+      tri2 <- with(zoabeta_pars,
                    get_tri_samples(group[2], frequency[2], severity[2], tsf[2], nsamples=N))
 
       # Weighted mixture
-      b <- runif(N) < zibeta_pars$wt[1]
+      b <- runif(N) < zoabeta_pars$wt[1]
       tri <- rbind(tri[b,], tri2[!b,])
 
       # Overall response values calculated using default function (with default args)
       overall <- .FUN_OVERALL(tri)
 
-      pars <- .do_find_zibeta_approximation(overall, pzero_threshold = 0.99)
+      pars <- zoabeta::fit_zoabeta(overall, edge_threshold = 0.99)
 
       dat_beta_undef$pzero[j] <- pars['pzero']
       dat_beta_undef$shape1[j] <- pars['shape1']
@@ -498,7 +500,7 @@ get_zibeta_parameters <- function(grp,
 #' # Get data for three distributions that differ in the
 #' # probability of zero.
 #' #
-#' dat <- get_zibeta_ggdata(pzero = c(0, 0.3, 0.6), shape1 = 20, shape2 = 30)
+#' dat <- get_zoabeta_ggdata(pzero = c(0, 0.3, 0.6), shape1 = 20, shape2 = 30)
 #'
 #' ggplot(data = dat) +
 #'   geom_line(aes(x=x, y=y, colour=label), linewidth=1.5) +
@@ -508,14 +510,14 @@ get_zibeta_parameters <- function(grp,
 #' # for each. Note cross = FALSE tells the function NOT to generate
 #' # data for the eight orthogonal combinations of parameters.
 #' #
-#' dat <- get_zibeta_ggdata(pzero = c(0, 0.3), shape1 = c(20, 30), shape2 = c(30, 50),
-#'                          cross = FALSE)
+#' dat <- get_zoabeta_ggdata(pzero = c(0, 0.3), shape1 = c(20, 30), shape2 = c(30, 50),
+#'                           cross = FALSE)
 #'
 #' @export
 #'
-get_zibeta_ggdata <- function(pzero, shape1, shape2,
-                              type = c("density", "probability"),
-                              cross = TRUE) {
+get_zoabeta_ggdata <- function(pzero, shape1, shape2,
+                               type = c("density", "probability"),
+                               cross = TRUE) {
   type <- match.arg(type)
 
   if (cross) {
@@ -537,19 +539,19 @@ get_zibeta_ggdata <- function(pzero, shape1, shape2,
   param_sets$id <- 1:nsets
 
   fn <- switch(type,
-               density = dzibeta,
-               probability = pzibeta)
+               density = zoabeta::dzoabeta,
+               probability = zoabeta::pzoabeta)
 
   dat <- lapply(param_sets$id, function(id) {
     ps <- param_sets[id,]
 
     x <- seq(0, 1, length.out = 1001)
-    y <- fn(x, ps$pzero, ps$shape1, ps$shape2)
+    y <- fn(x, shape1 = ps$shape1, shape2 = ps$shape2, pzero = ps$pzero)
     data.frame(id = id, pzero = ps$pzero, shape1 = ps$shape1, shape2 = ps$shape2, x, y)
   })
 
   dat <- do.call(rbind, dat)
-  dat$label <- sprintf("zibeta(%g, %g, %g)", dat$pzero, dat$shape1, dat$shape2)
+  dat$label <- sprintf("zoabeta(%g, %g, %g, 0)", dat$shape1, dat$shape2, dat$pzero)
   dat$label <- factor(dat$label, levels = unique(dat$label))
 
   dat
