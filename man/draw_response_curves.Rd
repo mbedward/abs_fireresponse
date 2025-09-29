@@ -15,23 +15,30 @@ A \code{ggplot} object.
 }
 \description{
 This is a convenience function to graph the response of a specified group to
-each of the three component variables of fire regime: TSF (time since last
-fire), severity of the most recent fire and frequency of fires within a
-preceding fifty year period. For each component, the response curve is drawn
-with a bounding region, representing the point-wise degree of expert
-certainty at each discrete value.
+each of the three component variables of fire regime: Frequency (frequency of
+fires within a preceding fifty year period), fire), Severity (severity of the
+most recent fire expressed on a 1-8 scale) and TSF (time since last fire in
+years). For each component, the response curve is drawn with a bounding
+region, representing the point-wise degree of expert certainty at each
+discrete value.
 }
 \details{
 For each record in the data frame, the lower, most likely and upper estimates
-for relative abundance are presently interpreted as the minimum, modal and
+for relative suitability are presently interpreted as the minimum, modal and
 maximum parameters of a triangular distribution.
 }
 \examples{
+library(fireresponse)
+
+# Set a preferred theme for the graph appearance
+library(ggplot2)
+theme_set(theme_bw())
+
 # Graph the response curves for group 3
 draw_response_curves(3)
 
-# Change the default labels and add a title
-library(ggplot2)
+# Change the default labels and add a title using the `labs` function
+# from the ggplot2 package
 draw_response_curves(3) +
   labs(x = "Value", title = "Functional group 3")
 

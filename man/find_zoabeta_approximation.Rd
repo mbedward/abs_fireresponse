@@ -38,7 +38,7 @@ parameters will be fitted.}
 \value{
 A numeric vector with three named elements:
 \describe{
-  \item{pzero}{probability of zero relative abundance value}
+  \item{pzero}{probability of zero relative suitability value}
   \item{shape1}{first beta parameter for non-zero values (NA if pzero is close to 1.0)}
   \item{shape2}{second beta parameter for non-zero values (NA if pzero is close to 1.0)}
 }

@@ -10,9 +10,9 @@ A data frame with 666 rows and 6 columns:
 \item{group}{Integer identifier for the functional group (1-18)}
 \item{type}{Type of fire variable, coded as a factor with levels: frequency; severity; tsf}
 \item{value}{Value of the given fire variable (e.g. years for TSF)}
-\item{ra_lwr}{Estimate of lowest expected relative abundance}
-\item{ra_mode}{Estimate of most likely value for relative abundance}
-\item{ra_max}{Estimate of highest expected relative abundance}
+\item{ra_lwr}{Estimate of lowest expected relative suitability}
+\item{ra_mode}{Estimate of most likely value for relative suitability}
+\item{ra_max}{Estimate of highest expected relative suitability}
 }
 }
 \usage{
@@ -20,8 +20,8 @@ GroupExpertData
 }
 \description{
 A data frame with, for each functional group, bounded estimates for the
-expected relative abundance (on the unit interval) given discrete values for
-time since last fire (years); severity of last fire; and frequency of fire in
-the preceding fifty year period.
+expected relative suitability (on the unit interval) given discrete values
+for time since last fire (years); severity of last fire; and frequency of
+fire in the preceding fifty year period.
 }
 \keyword{datasets}

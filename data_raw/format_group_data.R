@@ -22,5 +22,18 @@ GroupExpertData <- local ({
 
 usethis::use_data(GroupExpertData, overwrite = TRUE)
 
+# Create a lookup table of fire component labels
+FireComponentLookup <- data.frame(
+  type = c("frequency", "severity", "tsf"),
+  short_label = c("Frequency", "Severity", "TSF"),
+  long_label = c("Frequency (50 years)", "Severity", "Time since fire")
+)
+
+# Check labels are in sync with data
+stopifnot(setequal(FireComponentLookup$type, GroupExpertData$type))
+
+usethis::use_data(FireComponentLookup, overwrite = TRUE)
+
 # Clean up
 rm(GroupExpertData)
+rm(FireComponentLookup)

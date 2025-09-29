@@ -109,7 +109,7 @@
 #'
 #' @return A numeric vector with three named elements:
 #' \describe{
-#'   \item{pzero}{probability of zero relative abundance value}
+#'   \item{pzero}{probability of zero relative suitability value}
 #'   \item{shape1}{first beta parameter for non-zero values (NA if pzero is close to 1.0)}
 #'   \item{shape2}{second beta parameter for non-zero values (NA if pzero is close to 1.0)}
 #' }
@@ -140,10 +140,10 @@ find_zoabeta_approximation <- function(the_group,
 #'
 #' Draws random samples from each of the triangular distributions representing
 #' the bounded expert estimates of the effect of each fire regime component
-#' (frequency, severity and time since fire) on the expected relative abundance
-#' of a given group. This function is mainly intended for generating the package
-#' data frame \code{\link{GroupOverallResponse}} but can also be used for other
-#' purposes.
+#' (frequency, severity and time since fire) on the expected relative
+#' suitability of a given group. This function is mainly intended for generating
+#' the package data frame \code{\link{GroupOverallResponse}} but can also be
+#' used for other purposes.
 #'
 #' @param the_group Integer group number: a single value between 1 and the
 #'   number of groups defined in \code{\link{GroupExpertData}} (currently 18).

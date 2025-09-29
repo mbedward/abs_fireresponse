@@ -39,8 +39,8 @@ A data frame with \code{nsamples} rows and a column for each fire
 \description{
 Draws random samples from each of the triangular distributions representing
 the bounded expert estimates of the effect of each fire regime component
-(frequency, severity and time since fire) on the expected relative abundance
-of a given group. This function is mainly intended for generating the package
-data frame \code{\link{GroupOverallResponse}} but can also be used for other
-purposes.
+(frequency, severity and time since fire) on the expected relative
+suitability of a given group. This function is mainly intended for generating
+the package data frame \code{\link{GroupOverallResponse}} but can also be
+used for other purposes.
 }

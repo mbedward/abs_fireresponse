@@ -1,14 +1,15 @@
 #' Draw response curves and bounding regions for a given group
 #'
 #' This is a convenience function to graph the response of a specified group to
-#' each of the three component variables of fire regime: TSF (time since last
-#' fire), severity of the most recent fire and frequency of fires within a
-#' preceding fifty year period. For each component, the response curve is drawn
-#' with a bounding region, representing the point-wise degree of expert
-#' certainty at each discrete value.
+#' each of the three component variables of fire regime: Frequency (frequency of
+#' fires within a preceding fifty year period), fire), Severity (severity of the
+#' most recent fire expressed on a 1-8 scale) and TSF (time since last fire in
+#' years). For each component, the response curve is drawn with a bounding
+#' region, representing the point-wise degree of expert certainty at each
+#' discrete value.
 #'
 #' For each record in the data frame, the lower, most likely and upper estimates
-#' for relative abundance are presently interpreted as the minimum, modal and
+#' for relative suitability are presently interpreted as the minimum, modal and
 #' maximum parameters of a triangular distribution.
 #'
 #' @param the_group Integer group number: a single value between 1 and the
@@ -19,18 +20,25 @@
 #' @importFrom ggplot2 ggplot aes facet_wrap geom_line geom_point geom_ribbon labs scale_x_continuous
 #'
 #' @examples
+#' library(fireresponse)
+#'
+#' # Set a preferred theme for the graph appearance
+#' library(ggplot2)
+#' theme_set(theme_bw())
+#'
 #' # Graph the response curves for group 3
 #' draw_response_curves(3)
 #'
-#' # Change the default labels and add a title
-#' library(ggplot2)
+#' # Change the default labels and add a title using the `labs` function
+#' # from the ggplot2 package
 #' draw_response_curves(3) +
 #'   labs(x = "Value", title = "Functional group 3")
 #'
 #' @export
 #'
 draw_response_curves <- function(the_group) {
-  dat_gg <- dplyr::filter(fireresponse::GroupExpertData, group == the_group)
+  dat_gg <- dplyr::filter(fireresponse::GroupExpertData, group == the_group) %>%
+    dplyr::mutate(type = .format_fire_component_label(type, "short"))
 
   ggplot(dat_gg, aes(x = value)) +
     geom_ribbon(aes(ymin = ra_lwr, ymax = ra_upr), fill = "darkred", alpha = 0.2) +
@@ -42,6 +50,23 @@ draw_response_curves <- function(the_group) {
     labs(x = "Fire component value", y = "Relative suitability") +
 
     facet_wrap(~type, scales = "free_x")
+}
+
+
+# Private helper function to format fire component type labels
+.format_fire_component_label <- function(label, format = c("short", "long")) {
+  format = match.arg(format)
+
+  label <- tolower(as.character(label))
+  checkmate::assert_subset(label, choices = FireComponentLookup$type)
+
+  ii <- match(label, FireComponentLookup$type)
+
+  if (format == "short") {
+    FireComponentLookup$short_label[ii]
+  } else {
+    FireComponentLookup$long_label[ii]
+  }
 }
 
 
@@ -76,7 +101,7 @@ draw_response_curves <- function(the_group) {
 #' @param linewidth Value to pass to ggplot for line width (default = 1).
 #'
 #' @param draw_pzero Logical. If \code{TRUE} (default), a separate graph showing
-#'   the probability of zero relative abundance under each fire regime is drawn
+#'   the probability of zero relative suitability under each fire regime is drawn
 #'   and placed above the graph of overall response distribution using the
 #'   \code{patchwork} package.
 #'
@@ -134,7 +159,7 @@ draw_overall_response <- function(the_group,
 
   gg <- gg +
     scale_x_continuous(breaks = seq(0, 1, 0.2)) +
-    labs(x = "Relative abundance", y = "Density")
+    labs(x = "Relative suitability", y = "Density")
 
   gg
 }
@@ -158,7 +183,7 @@ draw_overall_response <- function(the_group,
     geom_point(aes(x = pzero, colour = regime), size = 4) +
     scale_colour_viridis_d(option = colour_map, direction = -1, end = 0.8) +
     scale_x_continuous(breaks = seq(0, 1, 0.2), limits = c(0, 1)) +
-    labs(x = "Probability of zero relative abundance", y = "") +
+    labs(x = "Probability of zero relative suitability", y = "") +
     theme(legend.position = "none")
 
   if (ngroups > 1) {
@@ -174,7 +199,7 @@ draw_overall_response <- function(the_group,
 #' Prepare data to graph group overall response to fire regime(s)
 #'
 #' This is a convenience function that creates a data frame suitable for
-#' graphing the distribution of expected relative abundance values for one or
+#' graphing the distribution of expected relative suitability values for one or
 #' more fire regimes. It is mainly intended as a helper function to be called by
 #' the \code{\link{draw_overall_response}} function, but can also be called
 #' explicitly.
@@ -208,7 +233,7 @@ draw_overall_response <- function(the_group,
 #'   \emph{i} is defined by the \emph{i}th element of each of the three
 #'   component vectors. In this case, the vectors must all have the same length.
 #'
-#' @param dx Increment for relative abundance values.
+#' @param dx Increment for relative suitability values.
 #'
 #' @return A data frame suitable for use with ggplot, with columns:
 #'   group; frequency; severity; tsf; relabund (sequence of values from 0 to 1);

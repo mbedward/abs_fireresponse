@@ -35,7 +35,7 @@ values will result in 12 fire regimes. If \code{FALSE}, a fire regime
 \emph{i} is defined by the \emph{i}th element of each of the three
 component vectors. In this case, the vectors must all have the same length.}
 
-\item{dx}{Increment for relative abundance values.}
+\item{dx}{Increment for relative suitability values.}
 }
 \value{
 A data frame suitable for use with ggplot, with columns:
@@ -44,7 +44,7 @@ A data frame suitable for use with ggplot, with columns:
 }
 \description{
 This is a convenience function that creates a data frame suitable for
-graphing the distribution of expected relative abundance values for one or
+graphing the distribution of expected relative suitability values for one or
 more fire regimes. It is mainly intended as a helper function to be called by
 the \code{\link{draw_overall_response}} function, but can also be called
 explicitly.

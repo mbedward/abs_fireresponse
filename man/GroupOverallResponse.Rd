@@ -11,7 +11,7 @@ A data frame with 1683 rows and 7 columns:
 \item{frequency}{Number of fires in the preceding fifty years}
 \item{severity}{Severity of the most recent fire}
 \item{tsf}{Time since last fire (years)}
-\item{pzero}{Probability of zero relative abundance}
+\item{pzero}{Probability of zero relative suitability}
 \item{shape1}{First parameter of the approximating beta distribution}
 \item{shape2}{Second parameter of the approximating beta distribution}
 }

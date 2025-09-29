@@ -40,7 +40,7 @@ component vectors. In this case, the vectors must all have the same length.}
 \item{linewidth}{Value to pass to ggplot for line width (default = 1).}
 
 \item{draw_pzero}{Logical. If \code{TRUE} (default), a separate graph showing
-the probability of zero relative abundance under each fire regime is drawn
+the probability of zero relative suitability under each fire regime is drawn
 and placed above the graph of overall response distribution using the
 \code{patchwork} package.}
 
